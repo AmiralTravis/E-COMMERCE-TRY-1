@@ -1,7 +1,5 @@
-const db = require('../config/db');
-
 // Get cart items for a user
-exports.getCartItems = async (req, res) => {
+exports.getCart = async (req, res) => {
   const { userId } = req.params;
   try {
     const result = await db.query('SELECT * FROM cart WHERE user_id = $1', [userId]);
@@ -28,7 +26,7 @@ exports.addToCart = async (req, res) => {
 };
 
 // Update item quantity in cart
-exports.updateCartItem = async (req, res) => {
+exports.updateCart = async (req, res) => {
   const { userId, productId } = req.params;
   const { quantity } = req.body;
   try {

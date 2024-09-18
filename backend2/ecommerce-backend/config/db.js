@@ -1,57 +1,14 @@
-// const { Pool } = require('pg');
-// require('dotenv').config();
-
-// const pool = new Pool({
-//   connectionString: process.env.DATABASE_URL,
-// });
-
-// pool.on('connect', () => {
-//   console.log('Connected to the database');
-// });
-
-// module.exports = {
-//   query: (text, params) => pool.query(text, params),
-// };
-
-
-// require('dotenv').config();
-
-// const config = {
-//   development: {
-//     username: process.env.DB_USER,
-//     password: process.env.DB_PASSWORD,
-//     database: process.env.DB_NAME,
-//     host: process.env.DB_HOST || '127.0.0.1',
-//     dialect: 'postgres', // or 'mysql', 'sqlite', etc.
-//   },
-//   test: {
-//     username: process.env.DB_TEST_USER,
-//     password: process.env.DB_TEST_PASSWORD,
-//     database: process.env.DB_TEST_NAME,
-//     host: process.env.DB_TEST_HOST || '127.0.0.1',
-//     dialect: 'postgres', // or 'mysql', 'sqlite', etc.
-//   },
-//   production: {
-//     username: process.env.DB_PROD_USER,
-//     password: process.env.DB_PROD_PASSWORD,
-//     database: process.env.DB_PROD_NAME,
-//     host: process.env.DB_PROD_HOST || '127.0.0.1',
-//     dialect: 'postgres', // or 'mysql', 'sqlite', etc.
-//   },
-// };
-
-// module.exports = config;
-
-
 require('dotenv').config(); // Ensure dotenv is required to load environment variables
+const { Sequelize } = require('sequelize'); // Import Sequelize
 
+// Define configurations for different environments
 const config = {
   development: {
-    username: process.env.DB_USER || 'postgres', 
-    password: process.env.DB_PASSWORD || 'edb is good with sql', 
+    username: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'edb is good with sql',
     database: process.env.DB_NAME || 'ECOMMERCEkadatabase', // Case-sensitive database name
     host: process.env.DB_HOST || '127.0.0.1',
-    dialect: 'postgres', // or other dialects like 'mysql', 'sqlite', etc.
+    dialect: 'postgres',
   },
   test: {
     username: process.env.DB_TEST_USER || 'postgres',
@@ -69,4 +26,27 @@ const config = {
   },
 };
 
-module.exports = config;
+// Select the current environment (development by default)
+const env = process.env.NODE_ENV || 'development';
+const currentConfig = config[env];
+
+// Initialize Sequelize with the current environment's config
+const sequelize = new Sequelize(
+  currentConfig.database,
+  currentConfig.username,
+  currentConfig.password,
+  {
+    host: currentConfig.host,
+    dialect: currentConfig.dialect,
+    logging: false, // Disable logging; you can enable it if needed
+  }
+);
+
+// Test the connection (optional)
+sequelize.authenticate()
+  .then(() => console.log('Database connected...'))
+  .catch(err => console.error('Error connecting to database:', err));
+
+// Export both the Sequelize instance and the config
+module.exports = sequelize;
+module.exports.config = config;
