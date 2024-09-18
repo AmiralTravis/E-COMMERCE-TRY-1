@@ -1,9 +1,6 @@
-// import Vue from 'vue';
-// import Vuex from 'vuex';
+// import { createStore } from 'vuex';
 
-// Vue.use(Vuex);
-
-// export default new Vuex.Store({
+// const store = createStore({
 //   state: {
 //     cart: [],
 //   },
@@ -44,13 +41,16 @@
 //   },
 // });
 
-// ----------------------this above version was for vue 2, the below one is for vue3---------------------
-// src/store/index.js
-import { createStore } from 'vuex';
+// export default store;
 
-const store = createStore({
+
+
+import { createStore } from 'vuex';
+import products from './modules/products'; // Import the products module
+
+const cart = {
   state: {
-    cart: [],
+    cart: [], // Your existing cart state
   },
   mutations: {
     ADD_TO_CART(state, product) {
@@ -86,6 +86,14 @@ const store = createStore({
     cartItems: (state) => state.cart,
     cartTotalPrice: (state) =>
       state.cart.reduce((total, item) => total + item.price * item.quantity, 0),
+  },
+};
+
+// Create the Vuex store instance
+const store = createStore({
+  modules: {
+    products, // Include the products module
+    cart, // Include the cart module (same as your existing code)
   },
 });
 

@@ -1,5 +1,21 @@
 const db = require('../config/db');
 
+// Admin login
+exports.login = async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    // Replace with actual authentication logic
+    if (username === 'admin' && password === 'admin') {
+      res.json({ message: 'Login successful', token: 'admin-token' });
+    } else {
+      res.status(401).json({ error: 'Invalid credentials' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to log in' });
+  }
+};
+
 // Get all users
 exports.getAllUsers = async (req, res) => {
   try {
