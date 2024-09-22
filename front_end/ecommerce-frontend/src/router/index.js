@@ -7,7 +7,7 @@ import ProductDetails from '../views/ProductDetails.vue';
 import CartFrontend from '../views/CartFrontend.vue';
 import CheckoutFrontend from '../components/CheckoutFrontend.vue';
 import SignUp from '../components/SignUp.vue'; // Import the SignUp component
-import Login from '../components/Login.vue'; // Import the Login component
+import Login from '../components/LogIn.vue'; // Import the Login component
 
 const routes = [
   { path: '/', name: 'Home', component: HomeFrontend },
