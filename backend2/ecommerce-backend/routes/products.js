@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
+const authenticateToken = require('../middleware/authMiddleware');
 
-// Get all products
+// Get all products (public route)
 router.get('/', productController.getAllProducts);
 
-// Get a single product by ID
+// Get a single product by ID (public route)
 router.get('/:id', productController.getProductById);
 
-// Create a new product (Admin only)
-router.post('/', productController.createProduct);
+// Create a new product (Admin only - protected)
+router.post('/', authenticateToken, productController.createProduct);
 
-// Update a product by ID (Admin only)
-router.put('/:id', productController.updateProduct);
+// Update a product by ID (Admin only - protected)
+router.put('/:id', authenticateToken, productController.updateProduct);
 
-// Delete a product by ID (Admin only)
-router.delete('/:id', productController.deleteProduct);
+// Delete a product by ID (Admin only - protected)
+router.delete('/:id', authenticateToken, productController.deleteProduct);
 
 module.exports = router;

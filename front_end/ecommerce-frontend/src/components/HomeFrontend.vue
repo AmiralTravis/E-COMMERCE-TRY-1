@@ -85,7 +85,7 @@
 </template>
 
 <script>
-import Modal from './Modal.vue'; // Ensure the correct path to Modal.vue
+import Modal from './ModalFrontend.vue'; // Ensure the correct path to Modal.vue
 import axios from 'axios';
 
 export default {

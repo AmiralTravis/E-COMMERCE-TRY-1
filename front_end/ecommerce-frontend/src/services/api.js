@@ -2,8 +2,28 @@ import axios from 'axios';
 
 // Create an Axios instance with a base URL
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // Your backend base URL
+  baseURL: 'http://localhost:5000', // Your backend base URL
   timeout: 10000, // Optional: Request timeout in milliseconds
 });
+
+// Add an interceptor to attach the JWT token
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('authToken'); // Get the token from local storage
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`; // Attach the token in Authorization header
+  }
+  return config;
+}, error => {
+  return Promise.reject(error);
+});
+
+// Add response interceptor
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error.response);
+    return Promise.reject(error);
+  }
+);
 
 export default api;
