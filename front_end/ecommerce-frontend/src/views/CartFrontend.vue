@@ -1,4 +1,4 @@
-<template>
+   <template>
     <div>
       <h1>Your Cart</h1>
       <div v-if="cartItems.length === 0">Your cart is empty</div>
@@ -14,7 +14,7 @@
           />
         </li>
       </ul>
-      <h2>Total: ${{ totalPrice }}</h2>
+      <h2 v-if="cartItems.length > 0">Total: ${{ cartTotalPrice.toFixed(2) }}</h2>
     </div>
   </template>
   
@@ -22,15 +22,15 @@
   import { mapGetters, mapActions } from 'vuex';
   
   export default {
+    name: 'ShoppingCart',
     computed: {
-      ...mapGetters(['cartItems', 'cartTotalPrice']),
+      ...mapGetters('cart', ['cartItems', 'cartTotalPrice'])
     },
     methods: {
-      ...mapActions(['removeFromCart', 'updateCartQuantity']),
+      ...mapActions('cart', ['removeFromCart', 'updateCartQuantity']),
       updateQuantity(productId, quantity) {
         this.updateCartQuantity({ productId, quantity });
       },
-    },
+    }
   };
   </script>
-  
