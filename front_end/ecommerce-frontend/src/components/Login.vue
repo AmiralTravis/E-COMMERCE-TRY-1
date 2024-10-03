@@ -1,4 +1,4 @@
-   <!-- <template>
+  <!-- <template>
     <div>
       <form @submit.prevent="login">
         <div>
@@ -16,8 +16,6 @@
   </template>
   
   <script>
-  import axios from 'axios';
-  
   export default {
     data() {
       return {
@@ -29,24 +27,23 @@
     methods: {
       async login() {
         try {
-          const response = await axios.post('http://localhost:5000/api/auth/login', {
+          await this.$store.dispatch('auth/login', {
             username: this.username,
             password: this.password
           });
-          if (response.status === 200) {
-            localStorage.setItem('authToken', response.data.token);
-            this.$router.push('/dashboard'); // Redirect to a protected route
-          }
+          // Redirect to cart or checkout page instead of dashboard
+          this.$router.push('/cart');
         } catch (error) {
-          this.errorMessage = 'Invalid credentials. Please try again.';
+          this.errorMessage = error.response?.data?.message || 'Invalid credentials. Please try again.';
         }
       }
     }
   };
-  </script>
-   -->
+  </script> -->
 
-   <template>
+
+
+  <template>
     <div>
       <form @submit.prevent="login">
         <div>
@@ -64,7 +61,7 @@
   </template>
   
   <script>
-  import api from '../services/api';
+  import { nextTick } from 'vue';
   
   export default {
     data() {
@@ -77,19 +74,18 @@
     methods: {
       async login() {
         try {
-          const response = await api.post('/api/auth/login', {
+          await this.$store.dispatch('auth/login', {
             username: this.username,
             password: this.password
           });
-          if (response.status === 200) {
-            localStorage.setItem('authToken', response.data.token);
-            this.$router.push('/dashboard'); // Redirect to a protected route
-          }
+          // Force a re-render of the entire app
+          await nextTick();
+          // Redirect to cart or checkout page
+          this.$router.push('/checkout');
         } catch (error) {
-          this.errorMessage = 'Invalid credentials. Please try again.';
+          this.errorMessage = error.response?.data?.message || 'Invalid credentials. Please try again.';
         }
       }
     }
   };
   </script>
-  
