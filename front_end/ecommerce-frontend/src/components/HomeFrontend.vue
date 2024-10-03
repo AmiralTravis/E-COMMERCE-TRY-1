@@ -1,9 +1,9 @@
 <template>
   <div class="home">
-    <!-- Sign Up Button in the top right -->
+    <!-- Sign Up Button in the top right
     <div class="top-nav">
       <button @click="showSignUpModal = true" class="signup-btn">Sign Up</button>
-    </div>
+    </div> -->
 
     <!-- Hero Banner Section -->
     <div class="hero-banner">
@@ -164,13 +164,13 @@ export default {
 
 <style scoped>
 /* Add styles for the home page */
-.top-nav {
+/* .top-nav {
   display: flex;
   justify-content: flex-end;
   padding: 10px;
   background-color: #f5f5f5;
-}
-
+} */
+/* 
 .signup-btn {
   padding: 10px 20px;
   background-color: #007bff;
@@ -178,11 +178,11 @@ export default {
   border-radius: 5px;
   border: none;
   cursor: pointer;
-}
+} */
 
-.signup-btn:hover {
+/* .signup-btn:hover {
   background-color: #0056b3;
-}
+} */
 
 .hero-banner {
   text-align: center;

@@ -1,74 +1,30 @@
-// const express = require('express');
-// const User = require('../models/usersModels');
-// const router = express.Router();
-// const jwt = require('jsonwebtoken');
-
-// const SECRET_KEY = 'your-secret-key'; // Use a secure key
-
-// // Registration route
-// router.post('/register', async (req, res) => {
-//   const { username, email, password } = req.body;
-
-//   try {
-//     const user = await User.create({
-//       username,
-//       email,
-//       password, // Updated from passwordHash to password
-//     });
-
-//     res.status(201).json({ message: 'User registered successfully', user });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Error registering user', error });
-//   }
-// });
-
-// // Login route
-// router.post('/login', async (req, res) => {
-//   const { username, password } = req.body;
-
-//   try {
-//     const user = await User.findOne({ where: { username } });
-
-//     if (user && await user.validatePassword(password)) {
-//       const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
-      
-//       res.status(200).json({ message: 'Login successful', token });
-//     } else {
-//       res.status(401).json({ message: 'Invalid username or password' });
-//     }
-//   } catch (error) {
-//     res.status(500).json({ message: 'Error logging in', error });
-//   }
-// });
-
-// module.exports = router;
-
-
 const express = require('express');
 const User = require('../models/usersModels');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
-const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key'; // Use environment variable for security
+const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key';
 
-// Registration route
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
   try {
-    const user = await User.create({
-      username,
-      email,
-      password, // Ensure password is hashed in user model
+    const user = await User.create({ username, email, password });
+    const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1d' });
+    
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: { id: user.id, username: user.username, email: user.email }
     });
-
-    res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
-    res.status(500).json({ message: 'Error registering user', error });
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ message: 'Username or email already exists' });
+    }
+    res.status(500).json({ message: 'Error registering user', error: error.message });
   }
 });
 
-// Login route
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -76,14 +32,18 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ where: { username } });
 
     if (user && await user.validatePassword(password)) {
-      const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
+      const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1d' });
       
-      res.status(200).json({ message: 'Login successful', token });
+      res.status(200).json({
+        message: 'Login successful',
+        token,
+        user: { id: user.id, username: user.username, email: user.email }
+      });
     } else {
       res.status(401).json({ message: 'Invalid username or password' });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Error logging in', error });
+    res.status(500).json({ message: 'Error logging in', error: error.message });
   }
 });
 

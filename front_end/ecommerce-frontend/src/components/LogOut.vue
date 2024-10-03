@@ -1,4 +1,4 @@
-<template>
+   <!-- <template>
     <button @click="logout">Log Out</button>
   </template>
   
@@ -6,10 +6,29 @@
   export default {
     methods: {
       logout() {
-        localStorage.removeItem('authToken'); // Clear the token
-        this.$router.push('/login'); // Redirect to login page
+        this.$store.dispatch('auth/logout');
+        this.$router.push('/login');
+      }
+    }
+  };
+  </script> -->
+
+
+  <template>
+    <button @click="logout">Log Out</button>
+  </template>
+  
+  <script>
+  import { nextTick } from 'vue';
+  
+  export default {
+    methods: {
+      async logout() {
+        await this.$store.dispatch('auth/logout');
+        // Force a re-render of the entire app
+        await nextTick();
+        this.$router.push('/login');
       }
     }
   };
   </script>
-  
