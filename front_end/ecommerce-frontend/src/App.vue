@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div id="app">
     <HeaderFrontend @open-auth-popup="openAuthPopup" />
     <div class="main-content">
@@ -84,249 +84,116 @@ footer {
 }
 </style>
 
+ -->
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!-- 
-<template>
+ <template>
   <div id="app">
-    <HeaderFrontend @open-auth-popup="openAuthPopup" />
+    <HeaderFrontend />
     <div class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </div>
     <FooterFrontend />
-    <AuthPopup :isOpen="isAuthPopupOpen" @close="closeAuthPopup" />
   </div>
 </template>
 
 <script>
-import { mapActions } from 'vuex';
+import { defineComponent } from 'vue';
 import FooterFrontend from './components/FooterFrontend.vue';
 import HeaderFrontend from './components/HeaderFrontend.vue';
-import AuthPopup from './components/AuthPopup.vue';
 
-export default {
+export default defineComponent({
   name: 'App',
   components: {
     FooterFrontend,
     HeaderFrontend,
-    AuthPopup,
-  },
-  data() {
-    return {
-      isAuthPopupOpen: false
-    };
-  },
-  methods: {
-    ...mapActions('auth', ['checkAuth']),
-    openAuthPopup() {
-      this.isAuthPopupOpen = true;
-    },
-    closeAuthPopup() {
-      this.isAuthPopupOpen = false;
-    }
   },
   created() {
-    this.checkAuth();
-    if (this.$store.getters['auth/isAuthenticated']) {
-      console.log('User is authenticated');
-    } else {
-      console.log('User is not authenticated');
-    }
-  },
-  watch: {
-    '$store.state.auth.authStatus': {
-      handler(newStatus) {
-        console.log('Auth status changed:', newStatus);
-      },
-      deep: true
-    }
+    // Check authentication status when app is created
+    this.$store.dispatch('auth/checkAuth');
   }
-};
+});
 </script>
 
 <style>
-/* Styles remain unchanged */
 html, body {
   height: 100%;
   margin: 0;
+  font-family: 'Inter', sans-serif;
 }
 
 #app {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
   color: #2c3e50;
-  margin: 0;
 }
 
 .main-content {
   flex: 1;
-  padding: 0 20px;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-header {
-  background-color: #f8f9fa;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
 }
 
-footer {
-  background-color: #f8f9fa;
-  height: 60px;
-  line-height: 60px;
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    padding: 0 10px;
-  }
-}
-</style> -->
-<!-- 
-
-
-<template>
-  <div id="app">
-    <HeaderFrontend @open-auth-popup="openAuthPopup" />
-    <div class="main-content">
-      <router-view />
-    </div>
-    <FooterFrontend />
-    <AuthPopup :isOpen="isAuthPopupOpen" @close="closeAuthPopup" />
-  </div>
-</template>
-
-<script>
-import { mapActions, mapGetters } from 'vuex';
-import FooterFrontend from './components/FooterFrontend.vue';
-import HeaderFrontend from './components/HeaderFrontend.vue';
-import AuthPopup from './components/AuthPopup.vue';
-
-export default {
-  name: 'App',
-  components: {
-    FooterFrontend,
-    HeaderFrontend,
-    AuthPopup,
-  },
-  data() {
-    return {
-      isAuthPopupOpen: false
-    };
-  },
-  computed: {
-    ...mapGetters('auth', ['isAuthenticated', 'currentUser'])
-  },
-  methods: {
-    ...mapActions('auth', ['checkAuth']),
-    openAuthPopup() {
-      this.isAuthPopupOpen = true;
-    },
-    closeAuthPopup() {
-      this.isAuthPopupOpen = false;
-    }
-  },
-  created() {
-    this.checkAuth();
-    console.log('Initial auth state:', this.isAuthenticated ? 'Authenticated' : 'Not authenticated');
-  },
-  watch: {
-    isAuthenticated(newValue) {
-      console.log('Authentication status changed:', newValue ? 'Authenticated' : 'Not authenticated');
-      if (newValue) {
-        console.log('Current user:', this.currentUser);
-      }
-    }
-  }
-};
-</script>
-
-<style>
-/* Styles remain unchanged */
-html, body {
-  height: 100%;
-  margin: 0;
-}
-
-#app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin: 0;
-}
-
-.main-content {
-  flex: 1;
-  padding: 0 20px;
-}
-
-header {
-  background-color: #f8f9fa;
-}
-
-footer {
-  background-color: #f8f9fa;
-  height: 60px;
-  line-height: 60px;
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 768px) {
   .main-content {
-    padding: 0 10px;
+    padding: 10px;
   }
 }
-</style> -->
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
