@@ -1,58 +1,5 @@
-<!-- <template>
-  <div>
-    <h1>Product List</h1>
-    <div v-if="loading">Loading products...</div>
-    <div v-if="error">{{ error }}</div>
-    <ul v-if="products.length > 0">
-      <li v-for="product in products" :key="product.id">
-        {{ product.name }} - ${{ product.price }}
-        <button @click="handleAddToCart(product)">Add to Cart</button>
-      </li>
-    </ul>
-    <div v-if="!loading && !error && products.length === 0">No products found.</div>
-  </div>
-</template>
-
-<script>
-import { computed, onMounted } from 'vue'
-import { useStore } from 'vuex'
-
-export default {
-  name: 'ProductList',
-  setup() {
-    const store = useStore()
-
-    const products = computed(() => store.state.products.products)
-    const loading = computed(() => store.state.products.loading)
-    const error = computed(() => store.state.products.error)
-
-    const fetchProducts = () => {
-      store.dispatch('products/fetchProducts')
-    }
-
-    const handleAddToCart = (product) => {
-      store.dispatch('cart/addToCart', product)
-      console.log('Added to cart:', product)
-    }
-
-    onMounted(fetchProducts)
-
-    return {
-      products,
-      loading,
-      error,
-      handleAddToCart
-    }
-  }
-}
-</script> -->
-
-
-
-
-
 <template>
-  <div class="product-list">
+  <div class="products-container">
     <h1>Our Products</h1>
     
     <!-- Filters -->
@@ -85,23 +32,29 @@ export default {
     <!-- Loading State -->
     <div v-if="loading" class="loading">
       <p>Loading products...</p>
-    </div>
+    </div> 
 
     <!-- Error State -->
     <div v-else-if="error" class="error">
       <p>{{ error }}</p>
-    </div>
+    </div> 
 
     <!-- Product Grid -->
-    <div v-else class="product-grid">
+    <div v-else class="products-grid">
       <div v-for="product in filteredProducts" :key="product.id" class="product-card">
-        <img :src="`/api/placeholder/200/200`" :alt="product.name" />
-        <h2>{{ product.name }}</h2>
-        <p class="description">{{ product.description }}</p>
-        <p class="price">${{ product.price.toFixed(2) }}</p>
-        <div class="card-actions">
-          <button @click="addToCart(product)" class="add-to-cart">Add to Cart</button>
-          <router-link :to="`/products/${product.id}`" class="view-details">View Details</router-link>
+        <img :src="`/api/placeholder/200/200`" :alt="product.name" class="product-image" />
+        <div class="product-info">
+          <h2>{{ product.name }}</h2>
+          <p class="product-description">{{ product.description }}</p>
+          <p class="product-price">${{ product.price.toFixed(2) }}</p>
+          <div class="card-actions">
+            <button @click="addToCart(product)" class="add-to-cart-btn">
+              Add to Cart
+            </button>
+            <router-link :to="`/products/${product.id}`" class="view-details-btn">
+              View Details
+            </router-link>
+          </div>
         </div>
       </div>
     </div>
@@ -115,19 +68,18 @@ export default {
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue';
-import { useStore } from 'vuex';
+import { useProductStore } from '../stores/products';
+import { useCartStore } from '../stores/cart';
 
 export default defineComponent({
   name: 'ProductList',
   setup() {
-    const store = useStore();
+    const productStore = useProductStore();
+    const cartStore = useCartStore();
+    
     const searchQuery = ref('');
     const selectedCategory = ref('');
     const sortBy = ref('name');
-
-    const products = computed(() => store.state.products.products);
-    const loading = computed(() => store.state.products.loading);
-    const error = computed(() => store.state.products.error);
 
     const categories = [
       { id: 1, name: 'Electronics' },
@@ -137,7 +89,7 @@ export default defineComponent({
     ];
 
     const filteredProducts = computed(() => {
-      let result = [...products.value];
+      let result = [...productStore.products];
 
       // Apply search filter
       if (searchQuery.value) {
@@ -163,11 +115,11 @@ export default defineComponent({
     });
 
     const addToCart = (product) => {
-      store.dispatch('cart/addToCart', product);
+      cartStore.addToCart(product); // Changed from addItem to addToCart
     };
 
     onMounted(() => {
-      store.dispatch('products/fetchProducts');
+      productStore.fetchProducts();
     });
 
     return {
@@ -175,10 +127,10 @@ export default defineComponent({
       selectedCategory,
       sortBy,
       categories,
-      products,
+      products: computed(() => productStore.products),
       filteredProducts,
-      loading,
-      error,
+      loading: computed(() => productStore.loading),
+      error: computed(() => productStore.error),
       addToCart
     };
   }
@@ -186,7 +138,9 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.product-list {
+.products-container {
+  max-width: 1200px;
+  margin: 0 auto;
   padding: 20px;
 }
 
@@ -202,12 +156,14 @@ export default defineComponent({
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  width: 200px;
 }
 
-.product-grid {
+.products-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
+  margin-top: 20px;
 }
 
 .product-card {
@@ -215,67 +171,104 @@ export default defineComponent({
   border-radius: 8px;
   overflow: hidden;
   transition: transform 0.3s;
+  background-color: white;
 }
 
 .product-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-.product-card img {
+.product-image {
   width: 100%;
-  height: auto;
+  height: 200px;
+  object-fit: cover;
 }
 
-.product-card h2 {
+.product-info {
+  padding: 15px;
+}
+
+.product-info h2 {
   font-size: 1.2rem;
-  margin: 10px;
+  margin: 0 0 10px 0;
+  color: #333;
 }
 
-.description {
-  margin: 10px;
+.product-description {
   color: #666;
+  margin: 10px 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
-.price {
+.product-price {
+  font-size: 1.2em;
   font-weight: bold;
-  color: #e74c3c;
-  margin: 10px;
+  color: #2ecc71;
+  margin: 10px 0;
 }
 
 .card-actions {
   display: flex;
-  padding: 10px;
+  gap: 10px;
+  margin-top: 15px;
 }
 
-.add-to-cart,
-.view-details {
+.add-to-cart-btn,
+.view-details-btn {
   flex: 1;
   padding: 10px;
+  border-radius: 4px;
   text-align: center;
   text-decoration: none;
-  color: white;
+  font-weight: 500;
+  transition: background-color 0.3s;
 }
 
-.add-to-cart {
+.add-to-cart-btn {
   background-color: #3498db;
+  color: white;
   border: none;
   cursor: pointer;
 }
 
-.view-details {
+.add-to-cart-btn:hover {
+  background-color: #2980b9;
+}
+
+.view-details-btn {
   background-color: #34495e;
+  color: white;
+}
+
+.view-details-btn:hover {
+  background-color: #2c3e50;
 }
 
 .loading,
 .error,
 .empty-state {
   text-align: center;
-  padding: 20px;
+  padding: 40px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin: 20px 0;
 }
 
 @media (max-width: 768px) {
   .filters {
     flex-direction: column;
+  }
+  
+  .search-bar input,
+  .category-filter select,
+  .sort-filter select {
+    width: 100%;
+  }
+
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
 }
 </style>

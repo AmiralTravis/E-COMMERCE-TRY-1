@@ -38,7 +38,12 @@ const sequelize = new Sequelize(
   {
     host: currentConfig.host,
     dialect: currentConfig.dialect,
-    logging: false, // Disable logging; you can enable it if needed
+    logging: console.log, // Enable logging
+    // Add more detailed logging
+    dialectOptions: {
+      debug: true
+    }
+    // logging: false, // Disable logging; you can enable it if needed
   }
 );
 

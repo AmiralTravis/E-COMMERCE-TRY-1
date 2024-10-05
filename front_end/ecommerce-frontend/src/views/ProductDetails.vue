@@ -45,7 +45,7 @@
   <script setup>
   import { onMounted, ref } from 'vue';
   import { useRoute } from 'vue-router';
-  import { useProductStore } from '../stores/product';
+  import { useProductStore } from '../stores/products';
   import { useCartStore } from '../stores/cart';
   
   const route = useRoute();
