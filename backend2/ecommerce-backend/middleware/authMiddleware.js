@@ -1,27 +1,135 @@
+// // ecommerce-backend/middleware/authMiddleware.js
+
+// const jwt = require('jsonwebtoken');
+
+// const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
+// const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET;
+
+// const authenticateToken = (req, res, next) => {
+//   console.log('Authenticating token...');
+//   const accessToken = req.cookies.accessToken;
+//   const refreshToken = req.cookies.refreshToken;
+
+//   // Check if both tokens are missing
+//   if (!accessToken && !refreshToken) {
+//     console.log('No tokens provided. Authentication required.');
+//     return res.status(401).json({ 
+//       message: 'Authentication required',
+//       code: 'AUTH_REQUIRED'
+//     });
+//   }
+
+//   try {
+//     if (accessToken) {
+//       // Verify access token
+//       const decoded = jwt.verify(accessToken, ACCESS_TOKEN_SECRET);
+//       req.user = decoded;
+//       console.log('Access token verified. User:', decoded);
+//       return next();
+//     }
+
+//     // If only refresh token is present, verify it
+//     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+//     console.log('Refresh token verified. Decoded:', decoded);
+    
+//     // Generate a new access token
+//     const newAccessToken = jwt.sign(
+//       { id: decoded.id, username: decoded.username },
+//       ACCESS_TOKEN_SECRET,
+//       { expiresIn: '1h' }
+//     );
+
+//     // Set the new access token in the cookies
+//     res.cookie('accessToken', newAccessToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 60 * 60 * 1000 // 1 hour
+//     });
+
+//     req.user = decoded;
+//     console.log('New access token generated and set in cookies.');
+//     next();
+//   } catch (error) {
+//     console.error('Auth middleware error:', error);
+    
+//     // Clear cookies if authentication fails
+//     res.clearCookie('accessToken');
+//     res.clearCookie('refreshToken');
+    
+//     return res.status(401).json({ 
+//       message: 'Authentication expired',
+//       code: error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'AUTH_EXPIRED'
+//     });
+//   }
+// };
+
+// module.exports = authenticateToken;
+
+// ecommerce-backend/middleware/authMiddleware.js
+
 const jwt = require('jsonwebtoken');
 
-const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key'; // Ensure this matches the key used in auth routes
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET;
 
-// Middleware function to check if the user is authenticated
 const authenticateToken = (req, res, next) => {
   console.log('Authenticating token...');
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const accessToken = req.cookies.accessToken;
+  const refreshToken = req.cookies.refreshToken;
 
-  if (token == null) {
-    console.log('No token found');
-    return res.sendStatus(401); // Unauthorized if no token
+  // Check if both tokens are missing
+  if (!accessToken && !refreshToken) {
+    console.log('No tokens provided. Authentication required.');
+    return res.status(401).json({ 
+      message: 'Authentication required',
+      code: 'AUTH_REQUIRED'
+    });
   }
 
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) {
-      console.log('Token verification failed:', err.message);
-      return res.sendStatus(403); // Forbidden if token is invalid
+  try {
+    if (accessToken) {
+      // Verify access token
+      const decoded = jwt.verify(accessToken, ACCESS_TOKEN_SECRET);
+      req.user = decoded; // Attach user info to req object
+      console.log('Access token verified. User:', decoded);
+      return next();
     }
-    console.log('Token verified successfully');
-    req.user = user; // Attach user info to request object
-    next(); // Proceed to the next middleware or route handler
-  });
+
+    // If only refresh token is present, verify it
+    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+    console.log('Refresh token verified. Decoded:', decoded);
+    
+    // Generate a new access token
+    const newAccessToken = jwt.sign(
+      { id: decoded.id, username: decoded.username },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Set the new access token in the cookies
+    res.cookie('accessToken', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000 // 1 hour
+    });
+
+    req.user = decoded; // Attach user info to req object
+    console.log('New access token generated and set in cookies.');
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    
+    // Clear cookies if authentication fails
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    
+    return res.status(401).json({ 
+      message: 'Authentication expired',
+      code: error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'AUTH_EXPIRED'
+    });
+  }
 };
 
 module.exports = authenticateToken;

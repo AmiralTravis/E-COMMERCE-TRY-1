@@ -1,62 +1,6 @@
+// controllers/productController.js
+
 const db = require('../config/db');
-
-// exports.getAllProducts = async (req, res) => {
-//   console.log('Getting all products');
-//   try {
-//     console.log('Executing database query...');
-//     const result = await db.query('SELECT * FROM "Products"');
-//     console.log('Query executed. Result:', result);
-    
-//     if (!result) {
-//       console.log('Query result is null or undefined');
-//       return res.status(500).json({ error: 'Database query failed' });
-//     }
-    
-//     if (!result.rows) {
-//       console.log('Query result does not have a rows property');
-//       return res.status(500).json({ error: 'Unexpected query result structure' });
-//     }
-    
-//     console.log(`Found ${result.rows.length} products`);
-//     res.json(result.rows);
-//   } catch (err) {
-//     console.error('Error getting products:', err);
-//     res.status(500).json({ error: 'Failed to fetch products', details: err.message });
-//   }
-// };
-
-// exports.getAllProducts = async (req, res) => {
-//   console.log('Getting all products');
-//   try {
-//     console.log('Executing database query...');
-//     const result = await db.query('SELECT * FROM "Products"');
-//     console.log('Query executed. Result:', result);
-    
-//     let products;
-//     if (Array.isArray(result) && result.length > 0) {
-//       // If result is an array, assume the first element contains the products
-//       products = result[0];
-//     } else if (result && result.rows) {
-//       // If result has a 'rows' property, use that
-//       products = result.rows;
-//     } else {
-//       console.log('Unexpected query result structure');
-//       return res.status(500).json({ error: 'Unexpected query result structure' });
-//     }
-    
-//     if (!Array.isArray(products)) {
-//       console.log('Products is not an array');
-//       return res.status(500).json({ error: 'Unexpected product data structure' });
-//     }
-    
-//     console.log(`Found ${products.length} products`);
-//     res.json(products);
-//   } catch (err) {
-//     console.error('Error getting products:', err);
-//     res.status(500).json({ error: 'Failed to fetch products', details: err.message });
-//   }
-// };
-
 exports.getAllProducts = async (req, res) => {
   console.log('Getting all products');
   try {

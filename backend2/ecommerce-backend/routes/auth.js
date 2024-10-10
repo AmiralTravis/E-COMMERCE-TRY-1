@@ -1,99 +1,294 @@
+// // ecommerce-backend/routes/auth.js
+
 // const express = require('express');
 // const router = express.Router();
 // const User = require('../models/usersModels');
 // const bcrypt = require('bcrypt');
+// const jwt = require('jsonwebtoken');
+// const authenticateToken = require('../middleware/authMiddleware'); // Import middleware
 
+// const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
+// const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+// // Login route
 // router.post('/login', async (req, res) => {
-//     try {
-//         console.log('Login attempt with:', req.body);
-        
-//         const { username, password } = req.body;
-        
-//         // Find user - explicitly include password
-//         const user = await User.findOne({
-//             where: { username },
-//             attributes: ['id', 'username', 'password'] // Explicitly include password
-//         });
-//         console.log('User found:', user ? 'Yes' : 'No');
-        
-//         if (!user) {
-//             return res.status(401).json({ message: 'User not found' });
-//         }
-        
-//         // Compare password
-//         const validPassword = await bcrypt.compare(password, user.password);
-//         console.log('Password valid:', validPassword);
-        
-//         if (!validPassword) {
-//             return res.status(401).json({ message: 'Invalid password' });
-//         }
-        
-//         // Success - don't send password back
-//         res.json({
-//             message: 'Login successful',
-//             user: {
-//                 id: user.id,
-//                 username: user.username
-//             }
-//         });
-//     } catch (error) {
-//         console.error('Login error:', error);
-//         res.status(500).json({ message: 'Server error', error: error.message });
+//   try {
+//     const { username, password } = req.body;
+//     const user = await User.findOne({
+//       where: { username },
+//       attributes: ['id', 'username', 'password']
+//     });
+
+//     if (!user || !(await user.validatePassword(password))) {
+//       return res.status(401).json({ message: 'Invalid credentials' });
 //     }
+
+//     const accessToken = jwt.sign(
+//       { id: user.id, username: user.username },
+//       ACCESS_TOKEN_SECRET,
+//       { expiresIn: '15m' }
+//     );
+
+//     const refreshToken = jwt.sign(
+//       { id: user.id, username: user.username },
+//       REFRESH_TOKEN_SECRET,
+//       { expiresIn: '7d' }
+//     );
+
+//     // Set cookies for tokens
+//     res.cookie('accessToken', accessToken, {
+//       maxAge: 15 * 60 * 1000,
+//       httpOnly: true, // Set to true for security
+//       sameSite: 'lax',
+//       secure: process.env.NODE_ENV === 'production'
+//     });
+
+//     res.cookie('refreshToken', refreshToken, {
+//       maxAge: 7 * 24 * 60 * 60 * 1000,
+//       httpOnly: true,
+//       sameSite: 'lax',
+//       secure: process.env.NODE_ENV === 'production'
+//     });
+
+//     // Return tokens and user info in response
+//     res.json({
+//       message: 'Login successful',
+//       user: {
+//         id: user.id,
+//         username: user.username
+//       },
+//       accessToken,   // Include access token in the response
+//       refreshToken   // Include refresh token in the response
+//     });
+//   } catch (error) {
+//     console.error('Login error:', error);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+
+// // Refresh token route
+// router.post('/refresh', authenticateToken, async (req, res) => { // Use middleware
+//   const refreshToken = req.cookies.refreshToken;
+
+//   if (!refreshToken) {
+//     return res.status(401).json({ message: 'No refresh token' });
+//   }
+
+//   try {
+//     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+//     const user = await User.findOne({
+//       where: { id: decoded.id },
+//       attributes: ['id', 'username']
+//     });
+
+//     if (!user) {
+//       return res.status(401).json({ message: 'User not found' });
+//     }
+
+//     const accessToken = jwt.sign(
+//       { id: user.id, username: user.username },
+//       ACCESS_TOKEN_SECRET,
+//       { expiresIn: '15m' }
+//     );
+
+//     res.cookie('accessToken', accessToken, {
+//       maxAge: 15 * 60 * 1000,
+//       httpOnly: true, // Set to true for security
+//       sameSite: 'lax',
+//       secure: process.env.NODE_ENV === 'production'
+//     });
+
+//     res.json({
+//       message: 'Token refreshed successfully',
+//       user: {
+//         id: user.id,
+//         username: user.username
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Refresh token error:', error);
+//     res.status(401).json({ message: 'Invalid refresh token' });
+//   }
+// });
+
+// // Verify token route
+// router.get('/verify', authenticateToken, async (req, res) => { // Use middleware
+//   const accessToken = req.cookies.accessToken;
+
+//   if (!accessToken) {
+//     return res.status(401).json({ message: 'No access token' });
+//   }
+
+//   try {
+//     const decoded = jwt.verify(accessToken, ACCESS_TOKEN_SECRET);
+//     const user = await User.findOne({
+//       where: { id: decoded.id },
+//       attributes: ['id', 'username']
+//     });
+
+//     if (!user) {
+//       return res.status(401).json({ message: 'User not found' });
+//     }
+
+//     res.json({ user }); // Successfully verified user
+//   } catch (error) {
+//     console.error('Verify token error:', error);
+//     return res.status(401).json({ message: 'Invalid access token' });
+//   }
+// });
+
+// // Logout route
+// router.post('/logout', (req, res) => {
+//   res.clearCookie('accessToken', {
+//     httpOnly: true,
+//     sameSite: 'lax',
+//     secure: process.env.NODE_ENV === 'production'
+//   });
+
+//   res.clearCookie('refreshToken', {
+//     httpOnly: true,
+//     sameSite: 'lax',
+//     secure: process.env.NODE_ENV === 'production'
+//   });
+
+//   res.json({ message: 'Logout successful' });
 // });
 
 // module.exports = router;
 
+// ecommerce-backend/routes/auth.js
 
 const express = require('express');
 const router = express.Router();
 const User = require('../models/usersModels');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const authenticateToken = require('../middleware/authMiddleware'); // Import middleware
 
+const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+// Login route
 router.post('/login', async (req, res) => {
-    try {
-        console.log('Login attempt with:', req.body);
-        
-        const { username, password } = req.body;
-        
-        const user = await User.findOne({
-            where: { username },
-            attributes: ['id', 'username', 'password']
-        });
-        console.log('User found:', user ? 'Yes' : 'No');
-        
-        if (!user) {
-            return res.status(401).json({ message: 'User not found' });
-        }
-        
-        const validPassword = await bcrypt.compare(password, user.password);
-        console.log('Password valid:', validPassword);
-        
-        if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid password' });
-        }
-        
-        // Generate JWT token
-        const token = jwt.sign(
-            { id: user.id, username: user.username },
-            process.env.JWT_SECRET || 'your-secret-key',
-            { expiresIn: '1h' }
-        );
-        
-        // Success response with token
-        res.json({
-            message: 'Login successful',
-            token,
-            user: {
-                id: user.id,
-                username: user.username
-            }
-        });
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({
+      where: { username },
+      attributes: ['id', 'username', 'password']
+    });
+
+    if (!user || !(await user.validatePassword(password))) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id, username: user.username },
+      REFRESH_TOKEN_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Set cookies for tokens
+    res.cookie('accessToken', accessToken, {
+      maxAge: 15 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
+    });
+
+    res.json({
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        username: user.username
+      },
+      accessToken,
+      refreshToken
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Refresh token route
+router.post('/refresh', authenticateToken, async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: 'No refresh token' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+    const user = await User.findOne({
+      where: { id: decoded.id },
+      attributes: ['id', 'username']
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username },
+      ACCESS_TOKEN_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.cookie('accessToken', accessToken, {
+      maxAge: 15 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
+    });
+
+    res.json({
+      message: 'Token refreshed successfully',
+      user: {
+        id: user.id,
+        username: user.username
+      }
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(401).json({ message: 'Invalid refresh token' });
+  }
+});
+
+// Verify token route
+router.get('/verify', authenticateToken, (req, res) => {
+  // User information is already attached to req.user by the middleware
+  res.json({ user: req.user }); // Successfully verified user
+});
+
+// Logout route
+router.post('/logout', (req, res) => {
+  res.clearCookie('accessToken', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+
+  res.json({ message: 'Logout successful' });
 });
 
 module.exports = router;
