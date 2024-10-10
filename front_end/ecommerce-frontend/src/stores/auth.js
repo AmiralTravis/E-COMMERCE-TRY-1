@@ -1,94 +1,263 @@
+// // stores/auth.js
+// import { defineStore } from 'pinia';
+// import api from '../services/api';
+// import { useCartStore } from './cart';
+
+// export const useAuthStore = defineStore('auth', {
+//   state: () => ({
+//     user: null,
+//     authStatus: 'pending', // Possible values: 'pending', 'authenticated', 'unauthenticated'
+//     isRefreshing: false,
+//     token: null, // Added to store the JWT token
+//   }),
+
+//   getters: {
+//     isAuthenticated: (state) => state.authStatus === 'authenticated' && !!state.user,
+//   },
+
+//   actions: {
+//     async verifyUser() {
+//       try {
+//         const response = await api.get('/auth/verify');
+//         this.setAuth(response.data.user);
+//         return true; // User is verified and authenticated
+//       } catch (error) {
+//         if (error.response?.status === 401) {
+//           this.clearAuth(); // Clear auth if the user is not authenticated
+//         }
+//         return false; // User is not authenticated
+//       }
+//     },
+
+//     async checkAuth() {
+//       const tokenExists = localStorage.getItem('accessToken'); // Check localStorage for token
+//       console.log('Token exists:', tokenExists);
+//       if (!tokenExists) {
+//         this.authStatus = 'unauthenticated';
+//         this.user = null;
+//         return false;
+//       }
+//       return await this.verifyUser();
+//     },
+
+//     async login(credentials) {
+//       try {
+//         const response = await api.post('/auth/login', credentials);
+//         const { user, accessToken, refreshToken } = response.data; // Update to access correct tokens
+
+//         this.setAuth(user);
+//         this.token = accessToken; // Store the access token in the store
+//         console.log('Access token set:', this.token);
+
+//         // Store the access token and refresh token in localStorage for persistence
+//         localStorage.setItem('accessToken', accessToken);
+//         localStorage.setItem('refreshToken', refreshToken);
+//         console.log('Access token stored in localStorage:', accessToken);
+//         console.log('Refresh token stored in localStorage:', refreshToken);
+
+//         // Call checkAuth after setting the token to ensure the state is updated
+//         await this.checkAuth(); // Optional: to validate the token immediately
+
+//         // Initialize cart after successful login
+//         const cartStore = useCartStore();
+//         await cartStore.syncLocalCartWithServer();
+//         await cartStore.fetchCart();
+
+//         return response;
+//       } catch (error) {
+//         console.error('Login error:', error);
+//         this.clearAuth();
+//         throw error; // Ensure to throw the error for further handling in the UI
+//       }
+//     },
+
+//     async refreshToken() {
+//       if (this.isRefreshing) {
+//         return new Promise((resolve) => {
+//           const checkRefresh = setInterval(() => {
+//             if (!this.isRefreshing) {
+//               clearInterval(checkRefresh);
+//               resolve();
+//             }
+//           }, 100);
+//         });
+//       }
+
+//       this.isRefreshing = true;
+//       try {
+//         const response = await api.post('/auth/refresh', {
+//           refreshToken: localStorage.getItem('refreshToken'), // Include the refresh token in the request
+//         });
+//         this.setAuth(response.data.user);
+//         this.token = response.data.accessToken; // Update the stored access token
+//         localStorage.setItem('accessToken', this.token); // Update access token in localStorage
+//         return response;
+//       } catch (error) {
+//         this.clearAuth();
+//         throw error;
+//       } finally {
+//         this.isRefreshing = false;
+//       }
+//     },
+
+//     async logout() {
+//       try {
+//         await api.post('/auth/logout');
+//       } finally {
+//         this.clearAuth();
+//         localStorage.removeItem('accessToken'); // Remove token from localStorage
+//         localStorage.removeItem('refreshToken'); // Remove refresh token from localStorage
+//         const cartStore = useCartStore();
+//         cartStore.clearCart();
+//       }
+//     },
+
+//     setAuth(user) {
+//       this.user = user;
+//       this.authStatus = 'authenticated';
+//     },
+
+//     clearAuth() {
+//       this.user = null;
+//       this.authStatus = 'unauthenticated';
+//       this.token = null; // Clear the token as well
+//       const cartStore = useCartStore();
+//       cartStore.fetchCart(); // Ensure cart data is retained on auth clear
+//     },
+//   },
+// });
+
+// stores/auth.js
+
 import { defineStore } from 'pinia';
 import api from '../services/api';
+import { useCartStore } from './cart';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('authToken') || null,
-    user: JSON.parse(localStorage.getItem('user') || 'null'),
-    authStatus: {
-      status: null,
-      lastUpdated: Date.now()
-    },
+    user: null,
+    authStatus: 'pending', // Possible values: 'pending', 'authenticated', 'unauthenticated'
+    isRefreshing: false,
+    token: null, // Added to store the JWT token
   }),
+
   getters: {
-    isAuthenticated: (state) => !!state.token,
-    currentUser: (state) => state.user,
-    authStatus: (state) => state.authStatus.status,
+    isAuthenticated: (state) => state.authStatus === 'authenticated' && !!state.user,
   },
+
   actions: {
+    async verifyUser() {
+      try {
+        const response = await api.get('/auth/verify');
+        this.setAuth(response.data.user);
+        return true; // User is verified and authenticated
+      } catch (error) {
+        if (error.response?.status === 401) {
+          this.clearAuth(); // Clear auth if the user is not authenticated
+        }
+        return false; // User is not authenticated
+      }
+    },
+
     async checkAuth() {
-      if (this.token) {
-        try {
-          const response = await api.get('/auth/verify');
-          this.setAuth({ token: this.token, user: response.data.user });
-        } catch (error) {
-          console.error('Token verification failed:', error);
-          this.clearAuth();
-          throw error;
-        }
-      } else {
+      const tokenExists = localStorage.getItem('accessToken'); // Check localStorage for token
+      console.log('Token exists:', tokenExists);
+      if (!tokenExists) {
+        this.authStatus = 'unauthenticated';
+        this.user = null;
+        return false;
+      }
+
+      // Use try-catch for better error handling
+      try {
+        return await this.verifyUser();
+      } catch (error) {
+        console.error('Error verifying user:', error);
         this.clearAuth();
+        return false;
       }
     },
-    setAuth({ token, user }) {
-      this.$patch({
-        token,
-        user,
-        authStatus: {
-          status: 'authenticated',
-          lastUpdated: Date.now()
-        }
-      });
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    },
-    clearAuth() {
-      this.$patch({
-        token: null,
-        user: null,
-        authStatus: {
-          status: 'unauthenticated',
-          lastUpdated: Date.now()
-        }
-      });
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      delete api.defaults.headers.common['Authorization'];
-    },
+
     async login(credentials) {
-      console.log('Auth store login called with:', credentials);
       try {
-        console.log('Sending login request with:', {
-          url: '/auth/login',
-          method: 'POST',
-          data: credentials
-        });
         const response = await api.post('/auth/login', credentials);
-        console.log('Login response:', response.data);
-        this.setAuth({ token: response.data.token, user: response.data.user });
+        const { user, accessToken, refreshToken } = response.data; // Update to access correct tokens
+
+        this.setAuth(user);
+        this.token = accessToken; // Store the access token in the store
+        console.log('Access token set:', this.token);
+
+        // Store the access token and refresh token in localStorage for persistence
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        console.log('Access token stored in localStorage:', accessToken);
+        console.log('Refresh token stored in localStorage:', refreshToken);
+
+        // Initialize cart after successful login
+        const cartStore = useCartStore();
+        await cartStore.syncLocalCartWithServer();
+        await cartStore.fetchCart();
+
         return response;
       } catch (error) {
-        console.error('Login error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
+        console.error('Login error:', error);
+        this.clearAuth();
+        throw error; // Ensure to throw the error for further handling in the UI
+      }
+    },
+
+    async refreshToken() {
+      if (this.isRefreshing) {
+        return new Promise((resolve) => {
+          const checkRefresh = setInterval(() => {
+            if (!this.isRefreshing) {
+              clearInterval(checkRefresh);
+              resolve();
+            }
+          }, 100);
         });
-        throw error;
       }
-    },
-    async register(credentials) {
+
+      this.isRefreshing = true;
       try {
-        const response = await api.post('/auth/register', credentials);
-        this.setAuth({ token: response.data.token, user: response.data.user });
+        const response = await api.post('/auth/refresh', {
+          refreshToken: localStorage.getItem('refreshToken'), // Include the refresh token in the request
+        });
+        this.setAuth(response.data.user);
+        this.token = response.data.accessToken; // Update the stored access token
+        localStorage.setItem('accessToken', this.token); // Update access token in localStorage
         return response;
       } catch (error) {
-        console.error('Registration error:', error.response?.data || error.message);
+        this.clearAuth();
         throw error;
+      } finally {
+        this.isRefreshing = false;
       }
     },
-    logout() {
-      this.clearAuth();
+
+    async logout() {
+      try {
+        await api.post('/auth/logout');
+      } finally {
+        this.clearAuth();
+        localStorage.removeItem('accessToken'); // Remove token from localStorage
+        localStorage.removeItem('refreshToken'); // Remove refresh token from localStorage
+        const cartStore = useCartStore();
+        cartStore.clearCart();
+      }
+    },
+
+    setAuth(user) {
+      this.user = user;
+      this.authStatus = 'authenticated';
+    },
+
+    clearAuth() {
+      this.user = null;
+      this.authStatus = 'unauthenticated';
+      this.token = null; // Clear the token as well
+      const cartStore = useCartStore();
+      cartStore.fetchCart(); // Ensure cart data is retained on auth clear
     },
   },
 });

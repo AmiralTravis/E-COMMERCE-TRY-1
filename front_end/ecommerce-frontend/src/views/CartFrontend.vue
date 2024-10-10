@@ -1,16 +1,17 @@
-<!-- 
-  <template>
+<!-- views/CartFrontend.vue -->
+
+  <!-- <template>
     <div class="cart-page">
       <h1>Your Shopping Cart</h1>
       
-      <div v-if="cartItems.length === 0" class="empty-cart">
+      <div v-if="getCartItems.length === 0" class="empty-cart">
         <p>Your cart is empty</p>
         <router-link to="/products" class="continue-shopping">Continue Shopping</router-link>
       </div>
       
       <div v-else class="cart-content">
         <div class="cart-items">
-          <div v-for="item in cartItems" :key="item.id" class="cart-item">
+          <div v-for="item in getCartItems" :key="item.id" class="cart-item">
             <img :src="`/api/placeholder/100/100`" :alt="item.name" class="item-image" />
             <div class="item-details">
               <h2>{{ item.name }}</h2>
@@ -44,64 +45,71 @@
         </div>
       </div>
     </div>
-  </template>
+  </template> -->
   
-  <script>
-  import { defineComponent, computed } from 'vue';
-  import { useCartStore } from '../stores/cart';
-  import { useRouter } from 'vue-router';
+    <!-- // Update CartFrontend.vue -->
+<!-- <script>
+import { defineComponent, computed, onMounted } from 'vue';
+import { useCartStore } from '../stores/cart';
+import { useAuthStore } from '../stores/auth';
+import { useRouter } from 'vue-router';
+
+export default defineComponent({
+  name: 'CartFrontend',
   
-  export default defineComponent({
-    name: 'CartFrontend',
-    setup() {
-      const cartStore = useCartStore();
-      const router = useRouter();
-  
-      const cartItems = computed(() => cartStore.items);
-      const subtotal = computed(() => 
-        cartItems.value.reduce((total, item) => total + item.price * item.quantity, 0)
-      );
-      const shipping = computed(() => subtotal.value > 100 ? 0 : 10);
-      const total = computed(() => subtotal.value + shipping.value);
-  
-      const increaseQuantity = (item) => {
-        cartStore.updateQuantity({
-          productId: item.id,
-          quantity: item.quantity + 1
-        });
-      };
-  
-      const decreaseQuantity = (item) => {
-        if (item.quantity > 1) {
-          cartStore.updateQuantity({
-            productId: item.id,
-            quantity: item.quantity - 1
-          });
-        }
-      };
-  
-      const removeFromCart = (productId) => {
-        cartStore.removeItem(productId);
-      };
-  
-      const proceedToCheckout = () => {
-        router.push('/checkout');
-      };
-  
-      return {
-        cartItems,
-        subtotal,
-        shipping,
-        total,
-        increaseQuantity,
-        decreaseQuantity,
-        removeFromCart,
-        proceedToCheckout
-      };
-    }
-  });
-  </script>
-  
+  setup() {
+    const cartStore = useCartStore();
+    const authStore = useAuthStore();
+    const router = useRouter();
+
+    onMounted(async () => {
+      if (authStore.isAuthenticated) {
+        await cartStore.fetchCart();
+      }
+    });
+
+    const cartItems = computed(() => cartStore.items);
+    const subtotal = computed(() => cartStore.totalPrice);
+    const shipping = computed(() => subtotal.value > 100 ? 0 : 10);
+    const total = computed(() => subtotal.value + shipping.value);
+
+    const increaseQuantity = async (item) => {
+      await cartStore.updateQuantity(item.id, item.quantity + 1);
+    };
+
+    const decreaseQuantity = async (item) => {
+      if (item.quantity > 1) {
+        await cartStore.updateQuantity(item.id, item.quantity - 1);
+      }
+    };
+
+    const removeFromCart = async (productId) => {
+      await cartStore.removeFromCart(productId);
+    };
+
+    const proceedToCheckout = () => {
+      if (!authStore.isAuthenticated) {
+        router.push('/login?redirect=/checkout');
+        return;
+      }
+      router.push('/checkout');
+    };
+
+    return {
+      cartItems,
+      subtotal,
+      shipping,
+      total,
+      increaseQuantity,
+      decreaseQuantity,
+      removeFromCart,
+      proceedToCheckout,
+      isAuthenticated: computed(() => authStore.isAuthenticated)
+    };
+  }
+});
+</script>
+
   <style scoped>
   .cart-page {
     max-width: 1200px;
@@ -224,108 +232,141 @@
   }
   </style> -->
 
-  <template>
-    <div class="cart-page">
-      <h1>Your Shopping Cart</h1>
-      
-      <div v-if="getCartItems.length === 0" class="empty-cart">
-        <p>Your cart is empty</p>
-        <router-link to="/products" class="continue-shopping">Continue Shopping</router-link>
+  <!-- views/CartFrontend.vue -->
+<template>
+  <div class="cart-page">
+    <h1>Your Shopping Cart</h1>
+    
+    <div v-if="cartItems.length === 0" class="empty-cart">
+      <p>Your cart is empty</p>
+      <router-link to="/products" class="continue-shopping">Continue Shopping</router-link>
+    </div>
+    
+    <div v-else class="cart-content">
+      <div class="cart-items">
+        <div v-for="item in cartItems" :key="item.id" class="cart-item">
+          <img :src="`/api/placeholder/100/100`" :alt="item.name" class="item-image" />
+          <div class="item-details">
+            <h2>{{ item.name }}</h2>
+            <p class="item-price">${{ item.price.toFixed(2) }}</p>
+          </div>
+          <div class="item-quantity">
+            <button @click="decreaseQuantity(item)" class="quantity-btn">-</button>
+            <span>{{ item.quantity }}</span>
+            <button @click="increaseQuantity(item)" class="quantity-btn">+</button>
+          </div>
+          <p class="item-total">${{ (item.price * item.quantity).toFixed(2) }}</p>
+          <button @click="removeFromCart(item.id)" class="remove-btn">Remove</button>
+        </div>
       </div>
       
-      <div v-else class="cart-content">
-        <div class="cart-items">
-          <div v-for="item in getCartItems" :key="item.id" class="cart-item">
-            <img :src="`/api/placeholder/100/100`" :alt="item.name" class="item-image" />
-            <div class="item-details">
-              <h2>{{ item.name }}</h2>
-              <p class="item-price">${{ item.price.toFixed(2) }}</p>
-            </div>
-            <div class="item-quantity">
-              <button @click="decreaseQuantity(item)" class="quantity-btn">-</button>
-              <span>{{ item.quantity }}</span>
-              <button @click="increaseQuantity(item)" class="quantity-btn">+</button>
-            </div>
-            <p class="item-total">${{ (item.price * item.quantity).toFixed(2) }}</p>
-            <button @click="removeFromCart(item.id)" class="remove-btn">Remove</button>
-          </div>
+      <div class="cart-summary">
+        <h2>Order Summary</h2>
+        <div class="summary-row">
+          <span>Subtotal:</span>
+          <span>${{ subtotal.toFixed(2) }}</span>
         </div>
-        
-        <div class="cart-summary">
-          <h2>Order Summary</h2>
-          <div class="summary-row">
-            <span>Subtotal:</span>
-            <span>${{ subtotal.toFixed(2) }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Shipping:</span>
-            <span>${{ shipping.toFixed(2) }}</span>
-          </div>
-          <div class="summary-row total">
-            <span>Total:</span>
-            <span>${{ total.toFixed(2) }}</span>
-          </div>
-          <button @click="proceedToCheckout" class="checkout-btn">Proceed to Checkout</button>
+        <div class="summary-row">
+          <span>Shipping:</span>
+          <span>${{ shipping.toFixed(2) }}</span>
         </div>
+        <div class="summary-row total">
+          <span>Total:</span>
+          <span>${{ total.toFixed(2) }}</span>
+        </div>
+        <button @click="proceedToCheckout" class="checkout-btn">Proceed to Checkout</button>
       </div>
     </div>
-  </template>
+  </div>
+</template>
+
+<script>
+import { defineComponent, computed, onMounted, watch } from 'vue';
+import { useCartStore } from '../stores/cart';
+import { useAuthStore } from '../stores/auth';
+import { useRouter } from 'vue-router';
+
+export default defineComponent({
+  name: 'CartFrontend',
   
-  <script>
-  import { defineComponent, computed } from 'vue';
-  import { useCartStore } from '../stores/cart';
-  import { useRouter } from 'vue-router';
-  
-  export default defineComponent({
-    name: 'CartFrontend',
-    setup() {
-      const cartStore = useCartStore();
-      const router = useRouter();
-  
-      const getCartItems = computed(() => cartStore.getCartItems);
-      const subtotal = computed(() => cartStore.getCartTotalPrice);
-      const shipping = computed(() => subtotal.value > 100 ? 0 : 10);
-      const total = computed(() => subtotal.value + shipping.value);
-  
-      const increaseQuantity = (item) => {
-        cartStore.updateCartQuantity({
-          productId: item.id,
-          quantity: item.quantity + 1
-        });
-      };
-  
-      const decreaseQuantity = (item) => {
-        if (item.quantity > 1) {
-          cartStore.updateCartQuantity({
-            productId: item.id,
-            quantity: item.quantity - 1
-          });
+  setup() {
+    const cartStore = useCartStore();
+    const authStore = useAuthStore();
+    const router = useRouter();
+
+    onMounted(async () => {
+      if (authStore.isAuthenticated) {
+        await cartStore.fetchCart();
+      } else {
+        cartStore.loadFromLocalStorage();
+      }
+    });
+
+    watch(() => authStore.isAuthenticated, async (newValue) => {
+      if (newValue) {
+        // User just logged in
+        await cartStore.syncLocalCartWithServer();
+      } else {
+        // User just logged out
+        cartStore.saveToLocalStorage();
+      }
+    });
+
+    const cartItems = computed(() => cartStore.items);
+    const subtotal = computed(() => cartStore.totalPrice);
+    const shipping = computed(() => subtotal.value > 100 ? 0 : 10);
+    const total = computed(() => subtotal.value + shipping.value);
+
+    const increaseQuantity = async (item) => {
+      if (authStore.isAuthenticated) {
+        await cartStore.updateQuantity(item.id, item.quantity + 1);
+      } else {
+        cartStore.updateLocalQuantity(item.id, item.quantity + 1);
+      }
+    };
+
+    const decreaseQuantity = async (item) => {
+      if (item.quantity > 1) {
+        if (authStore.isAuthenticated) {
+          await cartStore.updateQuantity(item.id, item.quantity - 1);
+        } else {
+          cartStore.updateLocalQuantity(item.id, item.quantity - 1);
         }
-      };
-  
-      const removeFromCart = (productId) => {
-        cartStore.removeFromCart(productId);
-      };
-  
-      const proceedToCheckout = () => {
-        router.push('/checkout');
-      };
-  
-      return {
-        getCartItems,
-        subtotal,
-        shipping,
-        total,
-        increaseQuantity,
-        decreaseQuantity,
-        removeFromCart,
-        proceedToCheckout
-      };
-    }
-  });
-  </script>
-  
-  <style scoped>
+      }
+    };
+
+    const removeFromCart = async (productId) => {
+      if (authStore.isAuthenticated) {
+        await cartStore.removeFromCart(productId);
+      } else {
+        cartStore.removeFromLocalCart(productId);
+      }
+    };
+
+    const proceedToCheckout = () => {
+      if (!authStore.isAuthenticated) {
+        router.push('/login?redirect=/checkout');
+        return;
+      }
+      router.push('/checkout');
+    };
+
+    return {
+      cartItems,
+      subtotal,
+      shipping,
+      total,
+      increaseQuantity,
+      decreaseQuantity,
+      removeFromCart,
+      proceedToCheckout,
+      isAuthenticated: computed(() => authStore.isAuthenticated)
+    };
+  }
+});
+</script>
+
+<style scoped>
   .cart-page {
     max-width: 1200px;
     margin: 0 auto;

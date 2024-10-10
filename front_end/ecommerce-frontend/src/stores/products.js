@@ -1,5 +1,7 @@
+// src/stores/products.js
+
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '../services/api';
 
 export const useProductStore = defineStore('products', {
   state: () => ({
@@ -11,23 +13,25 @@ export const useProductStore = defineStore('products', {
   actions: {
     async fetchProducts() {
       console.log('Fetching products...');
-      if (this.products.length > 0) {
-        console.log('Products already in state:', this.products);
-        return;
-      }
       this.loading = true;
       this.error = null;
       try {
-        const response = await axios.get('http://localhost:5000/api/products');
+        const response = await api.get('/products');
         console.log('Products fetched:', response.data);
         this.products = response.data;
       } catch (error) {
         console.error('Error fetching products:', error);
-        this.error = 'Failed to load products';
+        this.error = error.response?.data?.message || 'Failed to load products';
+        throw error;
       } finally {
         this.loading = false;
       }
     },
+
+    clearProducts() {
+      this.products = [];
+      this.error = null;
+    }
   },
 
   getters: {
