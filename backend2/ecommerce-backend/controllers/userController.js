@@ -49,40 +49,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// // Login user
-// exports.loginUser = async (req, res) => {
-//   const { username, password } = req.body;
-//   try {
-//     const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
-//     const user = result.rows[0];
-
-//     if (!user) {
-//       console.error('User not found:', username); // Log if the user is not found
-//       return res.status(401).json({ message: 'Invalid username or password' });
-//     }
-
-//     if (await bcrypt.compare(password, user.password)) {
-//       // Generate a new access token and refresh token
-//       const accessToken = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
-//       const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '7d' }); // Optional: Use separate secret for refresh token
-
-//       // Set the refresh token in a cookie (optional)
-//       res.cookie('refreshToken', refreshToken, { httpOnly: true });
-
-//       // Respond with both tokens
-//       res.status(200).json({
-//         message: 'Login successful',
-//         accessToken, // Send back the access token
-//       });
-//     } else {
-//       res.status(401).json({ message: 'Invalid username or password' });
-//     }
-//   } catch (err) {
-//     console.error('Login error:', err);
-//     res.status(500).json({ error: 'Failed to login user' });
-//   }
-// };
-
 // Login user
 exports.loginUser = async (req, res) => {
   const { username, password } = req.body;

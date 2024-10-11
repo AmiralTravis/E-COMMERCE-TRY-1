@@ -2,9 +2,10 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
-const CartItem = sequelize.define('CartItem', {
+const Carts = sequelize.define('Carts', { // Changed from CartItem to Carts
   userId: {
     type: DataTypes.INTEGER,
+    field: 'userId',
     references: {
       model: 'Users',
       key: 'id',
@@ -12,6 +13,7 @@ const CartItem = sequelize.define('CartItem', {
   },
   productId: {
     type: DataTypes.INTEGER,
+    field: 'productId',
     references: {
       model: 'Products',
       key: 'id',
@@ -25,4 +27,4 @@ const CartItem = sequelize.define('CartItem', {
   timestamps: true,
 });
 
-module.exports = CartItem;
+module.exports = Carts; // Export Carts
