@@ -1,54 +1,8 @@
-// // models/index.js
-// const Product = require('./productsModels');
-// const User = require('./usersModels');
-// const Order = require('./ordersModels');
-// const CartItem = require('./cartModels');
-// const Review = require('./reviewsModels');
-// const Category = require('./categoriesModels');
-// const Address = require('./addressesModels');
-// const Payment = require('./paymentsModels');
-// const Wishlist = require('./wishlistsModels');
-// const Admin = require('./adminModels');
-
-// // Define relationships
-// Product.belongsTo(Category);
-// Category.hasMany(Product);
-
-// Product.hasMany(Review);
-// Review.belongsTo(Product);
-
-// User.hasMany(Order);
-// Order.belongsTo(User);
-
-// User.hasMany(CartItem);
-// CartItem.belongsTo(User);
-
-// Product.belongsToMany(User, { through: Wishlist });
-// User.belongsToMany(Product, { through: Wishlist });
-
-// Order.hasMany(Payment);
-// Payment.belongsTo(Order);
-
-// User.hasMany(Address);
-// Address.belongsTo(User);
-
-// module.exports = {
-//   Product,
-//   User,
-//   Order,
-//   CartItem,
-//   Review,
-//   Category,
-//   Address,
-//   Payment,
-//   Wishlist,
-//   Admin,
-// };
-
+// models/index.js
 const Product = require('./productsModels');
 const User = require('./usersModels');
-const Order = require('./ordersModels');
-const CartItem = require('./cartModels');
+const Order = require('./orders.Models');
+const Carts = require('./cartModels'); // Updated reference to Carts
 const Review = require('./reviewsModels');
 const Category = require('./categoriesModels');
 const Address = require('./addressesModels');
@@ -66,18 +20,24 @@ Review.belongsTo(Product);
 User.hasMany(Order);
 Order.belongsTo(User);
 
-User.hasMany(CartItem);
-CartItem.belongsTo(User);
-
-// New association: Product <-> CartItem
-Product.hasMany(CartItem, {
-  foreignKey: 'productId',
-  as: 'cartItems'
+User.hasMany(Carts, {
+  foreignKey: 'userId', // Explicitly set the foreign key name
+}); // Updated to use Carts
+Carts.belongsTo(User, {
+  foreignKey: 'userId', // Explicitly define the foreign key
+  as: 'user' // Optional alias for the relationship
 });
 
-CartItem.belongsTo(Product, {
+
+// New association: Product <-> Carts
+Product.hasMany(Carts, {
   foreignKey: 'productId',
-  as: 'product'
+  as: 'cartItems' // Alias for accessing Carts through Product
+});
+
+Carts.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product' // Alias for accessing Product from Carts
 });
 
 Product.belongsToMany(User, { through: Wishlist });
@@ -93,7 +53,7 @@ module.exports = {
   Product,
   User,
   Order,
-  CartItem,
+  Carts, // Export Carts
   Review,
   Category,
   Address,
