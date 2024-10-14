@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/usersModels');
 const userController = require('../controllers/userController'); // Import userController
-const bcrypt = require('bcrypt');
+const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('../middleware/authMiddleware'); // Import middleware
 

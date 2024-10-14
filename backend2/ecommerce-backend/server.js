@@ -72,20 +72,6 @@ app.use((req, res, next) => {
 
 
 // Database setup
-// const db = require('./models'); // Import the db object from models/index.js
-// const User = db.User; // Get the User model from the db object
-
-// (async () => {
-//   try {
-//     await db.sequelize.authenticate();
-//     console.log('Database connection established successfully.');
-//     const testUser = await User.findOne();
-//     console.log('Test query successful. User found:', !!testUser);
-//   } catch (err) {
-//     console.error('Database connection error:', err);
-//   }
-// })();
-
 const db = require('./models');
 const { User, Cart } = db;
 
