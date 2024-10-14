@@ -1,11 +1,11 @@
-// controllers/cartController.js
-const { Carts, Product } = require('../models/index'); // Import from indexModels.js
+// // controllers/cartController.js
 
+const db = require('../models');
+const { Cart, Product } = db;
 
 exports.getCart = async (req, res) => {
   console.log('Entering getCart method...');
 
-  // Check if req.user is defined
   if (!req.user || !req.user.id) {
     console.log('Unauthorized access attempt.');
     return res.status(401).json({ message: 'Unauthorized' });
@@ -15,21 +15,18 @@ exports.getCart = async (req, res) => {
     const userId = req.user.id;
     console.log('Fetching cart for user ID:', userId);
     
-    // Query to include the Product model
-    const cart = await Carts.findAll({
-      where: { userId: req.user.id },
+    const cart = await Cart.findAll({
+      where: { userId: userId },
       include: [{
         model: Product,
-        as: 'product', // Use the alias defined in indexModels.js
-        attributes: ['id', 'name', 'price'], // Specify the attributes you want to retrieve
+        as: 'product', // Specify the alias here
+        attributes: ['id', 'name', 'price'],
       }],
-      logging: console.log // Log the SQL query for debugging
+      logging: console.log
     });
 
-    console.log('Fetched cart items:', JSON.stringify(cart, null, 2)); // Log the cart items
-
-    // Log the associations
-    console.log('Carts Associations:', Carts.associations);
+    console.log('Fetched cart items:', JSON.stringify(cart, null, 2));
+    console.log('Cart Associations:', Cart.associations);
     console.log('Product Associations:', Product.associations);
 
     res.json(cart);
@@ -39,7 +36,6 @@ exports.getCart = async (req, res) => {
   }
 };
 
-
 exports.addToCart = async (req, res) => {
   console.log('Entering addToCart method...');
 
@@ -48,7 +44,7 @@ exports.addToCart = async (req, res) => {
     const { productId, quantity = 1 } = req.body;
 
     console.log(`User ID: ${userId}, Product ID: ${productId}, Quantity: ${quantity}`);
-    const existingItem = await Carts.findOne({ // Updated to use Carts
+    const existingItem = await Cart.findOne({
       where: { userId, productId }
     });
 
@@ -59,7 +55,7 @@ exports.addToCart = async (req, res) => {
       return res.json(existingItem);
     } else {
       console.log('Creating new item in cart.');
-      const newItem = await Carts.create({ // Updated to use Carts
+      const newItem = await Cart.create({
         userId,
         productId,
         quantity
@@ -77,14 +73,13 @@ exports.updateCart = async (req, res) => {
 
   try {
     const userId = req.user.id;
-    const { cartItemId } = req.params; // Use cartItemId instead of productId
+    const { cartItemId } = req.params;
     const { quantity } = req.body;
 
     console.log(`User ID: ${userId}, Cart Item ID: ${cartItemId}, New Quantity: ${quantity}`);
     
-    // Find the cart item by its cartItemId and userId
-    const cartItem = await Carts.findOne({
-      where: { id: cartItemId, userId } // Ensure it's for the correct cart item and user
+    const cartItem = await Cart.findOne({
+      where: { id: cartItemId, userId }
     });
 
     if (!cartItem) {
@@ -92,7 +87,6 @@ exports.updateCart = async (req, res) => {
       return res.status(404).json({ message: 'Cart item not found' });
     }
 
-    // Update the quantity of the cart item
     cartItem.quantity = quantity;
     await cartItem.save();
     
@@ -109,13 +103,12 @@ exports.removeFromCart = async (req, res) => {
 
   try {
     const userId = req.user.id;
-    const { cartItemId } = req.params; // Changed to cartItemId
+    const { cartItemId } = req.params;
 
     console.log(`User ID: ${userId}, Cart Item ID: ${cartItemId}`);
     
-    // Use cartItemId to find the cart item for the specific user
-    const result = await Carts.destroy({
-      where: { userId, id: cartItemId } // Use id instead of productId
+    const result = await Cart.destroy({
+      where: { id: cartItemId, userId }
     });
 
     if (!result) {
@@ -123,7 +116,6 @@ exports.removeFromCart = async (req, res) => {
       return res.status(404).json({ message: 'Cart item not found' });
     }
 
-    // Successfully removed the item from the cart
     console.log('Successfully removed item from cart.');
     res.status(204).send();
   } catch (error) {
