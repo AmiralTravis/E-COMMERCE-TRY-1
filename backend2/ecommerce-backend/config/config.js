@@ -1,3 +1,4 @@
+// config/config.js
 require('dotenv').config(); // Ensure environment variables are loaded
 
 module.exports = {

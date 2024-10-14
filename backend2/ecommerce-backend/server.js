@@ -70,19 +70,38 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // Database setup
-const sequelize = require('./config/db');
-const User = require('./models/usersModels');
+// const db = require('./models'); // Import the db object from models/index.js
+// const User = db.User; // Get the User model from the db object
+
+// (async () => {
+//   try {
+//     await db.sequelize.authenticate();
+//     console.log('Database connection established successfully.');
+//     const testUser = await User.findOne();
+//     console.log('Test query successful. User found:', !!testUser);
+//   } catch (err) {
+//     console.error('Database connection error:', err);
+//   }
+// })();
+
+const db = require('./models');
+const { User, Cart } = db;
+
 (async () => {
   try {
-    await sequelize.authenticate();
+    await db.sequelize.authenticate();
     console.log('Database connection established successfully.');
     const testUser = await User.findOne();
-    console.log('Test query successful. User found:', !!testUser);
+    console.log('Test user query successful. User found:', !!testUser);
+    const testCart = await Cart.findOne();
+    console.log('Test cart query successful. Cart found:', !!testCart);
   } catch (err) {
     console.error('Database connection error:', err);
   }
 })();
+
 
 // Route wrapper for error handling
 const wrapRoute = (fn) => {

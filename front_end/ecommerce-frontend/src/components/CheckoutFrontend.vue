@@ -1,8 +1,22 @@
+<!-- components/CheckoutFrontend.vue -->
+
 <template>
   <div class="checkout-page">
     <h1>Checkout</h1>
 
-    <div class="checkout-content">
+    <div v-if="cartStore.loading" class="loading-message">
+      Loading checkout data...
+    </div>
+
+    <div v-else-if="cartStore.error" class="error-message">
+      {{ cartStore.error }}
+    </div>
+
+    <div v-else-if="cartStore.items.length === 0" class="empty-cart-message">
+      Your cart is empty. Please add items before proceeding to checkout.
+    </div>
+
+    <div v-else class="checkout-content">
       <div class="checkout-form">
         <form @submit.prevent="handleSubmit">
           <!-- Shipping Information -->
@@ -61,9 +75,9 @@
                 <option value="">Select a country</option>
                 <option value="US">United States</option>
                 <option value="CA">Canada</option>
-                <option value="GB">United Kingdom</option>
+                <option value="GB">United Kingdom</option> 
                 <!-- Add more countries as needed -->
-              </select>
+               </select>
             </div>
           </section>
 
@@ -116,14 +130,16 @@
             </div>
           </section>
 
-          <button type="submit" class="submit-btn">Place Order</button>
+          <button type="submit" class="submit-btn" :disabled="cartStore.loading">
+            {{ cartStore.loading ? 'Processing...' : 'Place Order' }}
+          </button>
         </form>
       </div>
 
       <div class="order-summary">
         <h2>Order Summary</h2>
         <div class="summary-items">
-          <div v-for="item in cartItems" :key="item.id" class="summary-item">
+          <div v-for="item in cartStore.items" :key="item.id" class="summary-item">
             <span>{{ item.name }} x {{ item.quantity }}</span>
             <span>${{ (item.price * item.quantity).toFixed(2) }}</span>
           </div>
@@ -131,7 +147,7 @@
         <div class="summary-totals">
           <div class="summary-row">
             <span>Subtotal</span>
-            <span>${{ subtotal.toFixed(2) }}</span>
+            <span>${{ cartStore.totalPrice.toFixed(2) }}</span>
           </div>
           <div class="summary-row">
             <span>Shipping</span>
@@ -147,67 +163,8 @@
   </div>
 </template>
 
-<!-- <script>
-import { defineComponent, ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useCartStore } from '../stores/cart';
-
-export default defineComponent({
-  name: 'CheckoutFrontend',
-  setup() {
-    const cartStore = useCartStore();
-    const router = useRouter();
-
-    const formData = ref({
-      fullName: '',
-      email: '',
-      address: '',
-      city: '',
-      postalCode: '',
-      country: '',
-      cardName: '',
-      cardNumber: '',
-      expiryDate: '',
-      cvv: ''
-    });
-
-    const cartItems = computed(() => cartStore.cartItems || []);
-    const subtotal = computed(() => {
-      if (!cartStore.cartTotal) return 0;
-      return cartStore.cartTotal;
-    });
-    const shipping = computed(() => subtotal.value > 100 ? 0 : 10);
-    const total = computed(() => subtotal.value + shipping.value);
-
-    const handleSubmit = async () => {
-      try {
-        console.log('Order submitted:', { 
-          formData: formData.value, 
-          orderTotal: total.value,
-          items: cartItems.value
-        });
-        
-        await cartStore.clearCart();
-        router.push('/order-success');
-      } catch (error) {
-        console.error('Error processing order:', error);
-      }
-    };
-
-    return {
-      formData,
-      cartItems,
-      subtotal,
-      shipping,
-      total,
-      handleSubmit
-    };
-  }
-});
-</script> -->
-
 <script>
-import { defineComponent, ref, computed } from 'vue';
+import { defineComponent, ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCartStore } from '../stores/cart';
 
@@ -230,30 +187,38 @@ export default defineComponent({
       cvv: ''
     });
 
-    const cartItems = computed(() => cartStore.getCartItems);
-    const subtotal = computed(() => cartStore.getCartTotalPrice);
-    const shipping = computed(() => subtotal.value > 100 ? 0 : 10);
-    const total = computed(() => subtotal.value + shipping.value);
+    const shipping = computed(() => cartStore.totalPrice > 100 ? 0 : 10);
+    const total = computed(() => cartStore.totalPrice + shipping.value);
 
     const handleSubmit = async () => {
       try {
+        if (cartStore.items.length === 0) {
+          throw new Error('Cannot submit order with an empty cart');
+        }
         console.log('Order submitted:', { 
           formData: formData.value, 
           orderTotal: total.value,
-          items: cartItems.value
+          items: cartStore.items
         });
+        
+        // Here you would typically send the order to your backend
+        // await api.post('/orders', { ...formData.value, items: cartStore.items, total: total.value });
         
         await cartStore.clearCart();
         router.push('/order-success');
       } catch (error) {
         console.error('Error processing order:', error);
+        // Here you might want to show an error message to the user
       }
     };
 
+    onMounted(async () => {
+      await cartStore.fetchCart();
+    });
+
     return {
       formData,
-      cartItems,
-      subtotal,
+      cartStore,
       shipping,
       total,
       handleSubmit
