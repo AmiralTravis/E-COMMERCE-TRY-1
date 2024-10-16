@@ -11,12 +11,19 @@ export const useProductStore = defineStore('products', {
   }),
 
   actions: {
-    async fetchProducts() {
-      console.log('Fetching products...');
+    async fetchProducts(searchQuery = '') {
+      console.log('Fetching products with search query:', searchQuery);
       this.loading = true;
       this.error = null;
       try {
-        const response = await api.get('/products');
+        let response;
+        if (searchQuery) {
+          response = await api.get('/products/search', {
+            params: { query: searchQuery }
+          });
+        } else {
+          response = await api.get('/products');
+        }
         console.log('Products fetched:', response.data);
         this.products = response.data;
       } catch (error) {
@@ -31,6 +38,11 @@ export const useProductStore = defineStore('products', {
     clearProducts() {
       this.products = [];
       this.error = null;
+    },
+
+    async searchProducts(query) {
+      console.log('Searching products with query:', query);
+      return this.fetchProducts(query);
     }
   },
 

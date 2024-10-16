@@ -1,4 +1,4 @@
-<!-- components/HeaderFrontend.vue -->
+<!-- components/HeaderFrontend.vue-->
 
 <template>
   <header class="header">
@@ -13,6 +13,7 @@
         <template v-if="isAuthenticated">
           <router-link to="/checkout">Checkout</router-link>
           <router-link to="/dashboard">Dashboard</router-link>
+          <router-link v-if="isAdmin" to="/admin">Admin Dashboard</router-link> <!-- Admin link added -->
           <button @click="handleLogout" class="logout-btn">Logout</button>
         </template>
         <template v-else>
@@ -38,6 +39,7 @@ export default defineComponent({
     const router = useRouter();
 
     const isAuthenticated = computed(() => authStore.isAuthenticated);
+    const isAdmin = computed(() => authStore.isAdmin); // Admin check added
     const cartItemCount = computed(() => cartStore.itemCount);
 
     const handleLogout = async () => {
@@ -47,6 +49,7 @@ export default defineComponent({
 
     return {
       isAuthenticated,
+      isAdmin, // Admin check returned
       cartItemCount,
       handleLogout
     };
