@@ -16,6 +16,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
     },
+    role: {
+      type: DataTypes.STRING,  // or DataTypes.VARCHAR if you want to specify length
+      allowNull: false,
+      defaultValue: 'user',  // Setting default role to 'user'
+    },
   }, {
     timestamps: true,
     freezeTableName: true,

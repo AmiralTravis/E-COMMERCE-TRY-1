@@ -104,3 +104,22 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete product' });
   }
 };
+
+exports.searchProducts = async (req, res) => {
+  const { query } = req.query;
+  console.log(`Searching for products with query: ${query}`);
+  try {
+    const result = await db.query(
+      'SELECT * FROM "Products" WHERE name ILIKE :searchTerm OR description ILIKE :searchTerm',
+      {
+        replacements: { searchTerm: `%${query}%` },
+        type: db.QueryTypes.SELECT
+      }
+    );
+    console.log(`Found ${result.length} products matching the search query`);
+    res.json(result);
+  } catch (err) {
+    console.error('Error searching products:', err);
+    res.status(500).json({ error: 'Failed to search products', details: err.message });
+  }
+};

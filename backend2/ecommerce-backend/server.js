@@ -1,4 +1,4 @@
-// // // // ecommerce-backend/server.js
+// // // // // ecommerce-backend/server.js
 
 const express = require('express');
 const cors = require('cors');
@@ -70,7 +70,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // Database setup
 const db = require('./models');
 const { User, Cart } = db;
@@ -87,7 +86,6 @@ const { User, Cart } = db;
     console.error('Database connection error:', err);
   }
 })();
-
 
 // Route wrapper for error handling
 const wrapRoute = (fn) => {
@@ -113,7 +111,7 @@ const paymentRoutes = require('./routes/payments');
 const wishlistRoutes = require('./routes/wishlists');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
-const authenticateToken = require('./middleware/authMiddleware');
+const {authenticateToken} = require('./middleware/authMiddleware');
 
 // Apply authentication routes first (unprotected)
 app.use('/api/auth', authRoutes);
@@ -192,7 +190,7 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   server.close(() => {
     console.log('Server closed');
-    sequelize.close().then(() => {
+    db.sequelize.close().then(() => {
       console.log('Database connection closed');
       process.exit(0);
     });

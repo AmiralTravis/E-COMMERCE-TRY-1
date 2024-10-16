@@ -9,7 +9,7 @@
           type="text" 
           v-model="searchQuery" 
           placeholder="Search products..."
-          @input="filterProducts"
+          @input="debounceSearch"
         >
       </div>
       <div class="category-filter">
@@ -42,7 +42,7 @@
     <!-- Product Grid -->
     <div v-else class="products-grid">
       <div v-for="product in filteredProducts" :key="product.id" class="product-card">
-        <img :src="`/api/placeholder/200/200`" :alt="product.name" class="product-image" />
+        <img :src="product.imageUrl" :alt="product.name" class="product-image" />
         <div class="product-info">
           <h2>{{ product.name }}</h2>
           <p class="product-description">{{ product.description }}</p>
@@ -67,9 +67,10 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted } from 'vue';
+import { defineComponent, ref, computed, onMounted, watch } from 'vue';
 import { useProductStore } from '../stores/products';
 import { useCartStore } from '../stores/cart';
+import debounce from 'lodash/debounce';
 
 export default defineComponent({
   name: 'ProductList',
@@ -91,14 +92,6 @@ export default defineComponent({
     const filteredProducts = computed(() => {
       let result = [...productStore.products];
 
-      // Apply search filter
-      if (searchQuery.value) {
-        result = result.filter(product => 
-          product.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-          product.description.toLowerCase().includes(searchQuery.value.toLowerCase())
-        );
-      }
-
       // Apply category filter
       if (selectedCategory.value) {
         result = result.filter(product => product.categoryId === selectedCategory.value);
@@ -115,11 +108,29 @@ export default defineComponent({
     });
 
     const addToCart = (product) => {
-      cartStore.addToCart(product); // Changed from addItem to addToCart
+      cartStore.addToCart(product);
+    };
+
+    const fetchProducts = async () => {
+      await productStore.fetchProducts(searchQuery.value);
+    };
+
+    const debounceSearch = debounce(() => {
+      fetchProducts();
+    }, 300);
+
+    const filterProducts = () => {
+      fetchProducts();
     };
 
     onMounted(() => {
-      productStore.fetchProducts();
+      fetchProducts();
+    });
+
+    watch(searchQuery, (newValue) => {
+      if (newValue === '') {
+        fetchProducts();
+      }
     });
 
     return {
@@ -127,11 +138,12 @@ export default defineComponent({
       selectedCategory,
       sortBy,
       categories,
-      products: computed(() => productStore.products),
       filteredProducts,
       loading: computed(() => productStore.loading),
       error: computed(() => productStore.error),
-      addToCart
+      addToCart,
+      debounceSearch,
+      filterProducts
     };
   }
 });
