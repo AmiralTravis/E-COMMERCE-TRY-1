@@ -63,11 +63,11 @@ const authenticateToken = (req, res, next) => {
 
 const isAdmin = (req, res, next) => {
   console.log('Checking admin status...');
-  if (req.user && req.user.role === 'admin') {
-    console.log('User is admin. Proceeding...');
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
+    console.log('User is admin or superadmin. Proceeding...');
     next();
   } else {
-    console.log('User is not admin. Access denied.');
+    console.log('User is not admin or superadmin. Access denied.');
     return res.status(403).json({
       message: 'Access denied. Admin privileges required.',
       code: 'ADMIN_REQUIRED'
@@ -75,4 +75,18 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken, isAdmin };
+const isSuperAdmin = (req, res, next) => {
+  console.log('Checking superadmin status...');
+  if (req.user && req.user.role === 'superadmin') {
+    console.log('User is superadmin. Proceeding...');
+    next();
+  } else {
+    console.log('User is not superadmin. Access denied.');
+    return res.status(403).json({
+      message: 'Access denied. Superadmin privileges required.',
+      code: 'SUPERADMIN_REQUIRED'
+    });
+  }
+};
+
+module.exports = { authenticateToken, isAdmin, isSuperAdmin };

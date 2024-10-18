@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { authenticateToken, isAdmin } = require('../middleware/authMiddleware');
+const { authenticateToken, isAdmin, isSuperAdmin } = require('../middleware/authMiddleware');
 
 // Apply authentication and admin check to all routes
 router.use(authenticateToken, isAdmin);
@@ -26,5 +26,16 @@ router.get('/sales-report', adminController.getSalesReport);
 
 // Low stock alerts
 router.get('/low-stock-alerts', adminController.getLowStockAlerts);
+
+// newly added routes..
+router.get('/admins', authenticateToken, isAdmin, adminController.getAllAdmins);
+router.post('/change-role', authenticateToken, isAdmin, adminController.changeUserRole);
+router.post('/create-admin', authenticateToken, isAdmin, adminController.createAdminAccount);
+router.get('/users', authenticateToken, isAdmin, adminController.getAllUsers);
+router.post('/promote-to-admin', adminController.promoteToAdmin);
+
+//superadmin routes.. 
+router.post('/remove-admin', authenticateToken, isSuperAdmin, adminController.removeAdmin);
+router.get('/all-admins', authenticateToken, isAdmin, adminController.getAllAdmins);
 
 module.exports = router;

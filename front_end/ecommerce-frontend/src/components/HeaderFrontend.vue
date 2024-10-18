@@ -1,5 +1,4 @@
 <!-- components/HeaderFrontend.vue-->
-
 <template>
   <header class="header">
     <nav class="nav">
@@ -13,7 +12,9 @@
         <template v-if="isAuthenticated">
           <router-link to="/checkout">Checkout</router-link>
           <router-link to="/dashboard">Dashboard</router-link>
-          <router-link v-if="isAdmin" to="/admin">Admin Dashboard</router-link> <!-- Admin link added -->
+          <router-link v-if="isSuperAdmin || isAdmin" to="/admin">
+            {{ isSuperAdmin ? 'Superadmin' : 'Admin' }} Dashboard
+          </router-link>
           <button @click="handleLogout" class="logout-btn">Logout</button>
         </template>
         <template v-else>
@@ -28,7 +29,7 @@
 <script>
 import { defineComponent, computed } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { useCartStore } from '../stores/cart'; // You'll need to create this
+import { useCartStore } from '../stores/cart';
 import { useRouter } from 'vue-router';
 
 export default defineComponent({
@@ -39,7 +40,8 @@ export default defineComponent({
     const router = useRouter();
 
     const isAuthenticated = computed(() => authStore.isAuthenticated);
-    const isAdmin = computed(() => authStore.isAdmin); // Admin check added
+    const isAdmin = computed(() => authStore.isAdmin);
+    const isSuperAdmin = computed(() => authStore.isSuperAdmin);
     const cartItemCount = computed(() => cartStore.itemCount);
 
     const handleLogout = async () => {
@@ -49,7 +51,8 @@ export default defineComponent({
 
     return {
       isAuthenticated,
-      isAdmin, // Admin check returned
+      isAdmin,
+      isSuperAdmin,
       cartItemCount,
       handleLogout
     };

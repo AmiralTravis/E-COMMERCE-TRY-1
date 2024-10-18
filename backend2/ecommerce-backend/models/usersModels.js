@@ -17,9 +17,9 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     role: {
-      type: DataTypes.STRING,  // or DataTypes.VARCHAR if you want to specify length
+      type: DataTypes.ENUM('user', 'admin', 'superadmin'),
       allowNull: false,
-      defaultValue: 'user',  // Setting default role to 'user'
+      defaultValue: 'user',
     },
   }, {
     timestamps: true,
@@ -29,6 +29,16 @@ module.exports = (sequelize, DataTypes) => {
       attributes: { exclude: ['password'] },
     },
   });
+
+  // Instance method to check if the user is a superadmin
+  User.prototype.isSuperAdmin = function() {
+    return this.role === 'superadmin';
+  };
+
+  // Instance method to check if the user is an admin or superadmin
+  User.prototype.isAdminOrSuperAdmin = function() {
+    return this.role === 'admin' || this.role === 'superadmin';
+  };
 
   return User;
 };

@@ -1,4 +1,4 @@
-// // // stores/auth.js
+// stores/auth.js
 
 import { defineStore } from 'pinia';
 import api from '../services/api';
@@ -14,7 +14,8 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => state.authStatus === 'authenticated' && !!state.user,
-    isAdmin: (state) => state.user && state.user.role === 'admin', // Check for admin role
+    isAdmin: (state) => state.user && (state.user.role === 'admin' || state.user.role === 'superadmin'),
+    isSuperAdmin: (state) => state.user && state.user.role === 'superadmin',
   },
 
   actions: {
@@ -51,10 +52,9 @@ export const useAuthStore = defineStore('auth', {
 
         const { user, accessToken, refreshToken } = response.data;
 
-        // Log the user role to verify if it's admin
-        console.log('User role:', user.role);  // <--- Check the role here
+        console.log('User role:', user.role);
 
-        this.setAuth(user); // Set user with role information
+        this.setAuth(user);
         this.token = accessToken;
         console.log('Access token set:', this.token);
 
@@ -77,7 +77,7 @@ export const useAuthStore = defineStore('auth', {
     async verifyUser() {
       try {
         const response = await api.get('/auth/verify');
-        this.setAuth(response.data.user); // Verify user role and status
+        this.setAuth(response.data.user);
         return true;
       } catch (error) {
         if (error.response?.status === 401) {
@@ -122,7 +122,7 @@ export const useAuthStore = defineStore('auth', {
         const response = await api.post('/auth/refresh', {
           refreshToken: localStorage.getItem('refreshToken'),
         });
-        this.setAuth(response.data.user); // Ensure user is set after refresh
+        this.setAuth(response.data.user);
         this.token = response.data.accessToken;
         localStorage.setItem('accessToken', this.token);
         return response;
@@ -147,7 +147,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     setAuth(user) {
-      this.user = user;  // Ensure role is part of user data
+      this.user = user;
       this.authStatus = 'authenticated';
       console.log('Auth set:', this.user, this.authStatus);
     },
@@ -161,7 +161,6 @@ export const useAuthStore = defineStore('auth', {
       cartStore.fetchCart();
     },
 
-    // New method to fetch user data
     async fetchUserData() {
       try {
         const response = await api.get('/users/me');
