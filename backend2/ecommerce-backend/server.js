@@ -1,8 +1,9 @@
-// // // // // ecommerce-backend/server.js
+// ecommerce-backend/server.js
 
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
 require('dotenv').config();
 
 const app = express();
@@ -16,6 +17,7 @@ const corsOptions = {
   exposedHeaders: ['Set-Cookie'],
 };
 
+// Error handling for uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (err) => {
   console.error('=== Uncaught Exception ===');
   console.error(err);
@@ -28,11 +30,14 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Reason:', reason);
 });
 
-// Middleware setup - order is important
+// Middleware setup
 app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json()); // Parse application/json for PayPal routes
+// app.use('/api', captureOrderRoute); // Use your route under a specific path
+
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -56,7 +61,6 @@ app.use((req, res, next) => {
       domain: process.env.NODE_ENV === 'production' ? process.env.DOMAIN : 'localhost'
     };
     
-    // Set appropriate maxAge based on token type
     if (name === 'accessToken') {
       defaultOptions.maxAge = 15 * 60 * 1000; // 15 minutes
     } else if (name === 'refreshToken') {
@@ -111,20 +115,21 @@ const paymentRoutes = require('./routes/payments');
 const wishlistRoutes = require('./routes/wishlists');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
-const {authenticateToken} = require('./middleware/authMiddleware');
+const paypalRoutes = require('./routes/paypal'); // PayPal routes import
+const captureOrderRoute = require('./routes/captureOrder'); // Adjust the path as necessary
+const { authenticateToken } = require('./middleware/authMiddleware');
 
 // Apply authentication routes first (unprotected)
 app.use('/api/auth', authRoutes);
 
-// Updated public paths
-const publicPaths = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/refresh',
-  '/products',
-  '/products/',
-  '/categories',
-  '/categories/'
+// Public paths regex for unprotected routes
+const publicPathsRegex = [
+  /^\/auth\/login$/,
+  /^\/auth\/register$/,
+  /^\/auth\/refresh$/,
+  /^\/products$/,
+  /^\/categories$/,
+  /^\/products\/[^\/]+\/reviews$/, // Add this line for product reviews
 ];
 
 // Authentication middleware for protected routes
@@ -133,11 +138,13 @@ app.use('/api', (req, res, next) => {
   console.log('Path:', req.path);
   console.log('Method:', req.method);
   console.log('Headers:', req.headers);
-  
-  // Skip auth for public paths and OPTIONS requests
-  if (publicPaths.some(path => req.path.startsWith(path)) || req.method === 'OPTIONS') {
+
+  const isPublicPath = publicPathsRegex.some((regex) => regex.test(req.path));
+
+  if (isPublicPath || req.method === 'OPTIONS') {
     return next();
   }
+
   authenticateToken(req, res, next);
 });
 
@@ -146,12 +153,13 @@ app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/cart', cartRoutes);
-app.use('/api/reviews', reviewRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/paypal', paypalRoutes); // Apply PayPal routes
+app.use('/api', captureOrderRoute); // Use your route under a specific path
 
 // Root route
 app.get('/', (req, res) => {
@@ -170,7 +178,6 @@ app.use((err, req, res, next) => {
   console.error('Error:', err);
   console.error('Stack:', err.stack);
   
-  // Don't expose error details in production
   const error = process.env.NODE_ENV === 'production' 
     ? { message: 'Internal Server Error' }
     : { message: err.message, stack: err.stack };

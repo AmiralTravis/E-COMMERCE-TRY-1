@@ -1,4 +1,4 @@
-// // front_end/ecommerce-frontend/src/router/index.js
+// front_end/ecommerce-frontend/src/router/index.js
 
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
@@ -13,6 +13,7 @@ import SignUp from '../components/SignUp.vue';
 import Login from '../components/LogIn.vue';
 import DashboardFrontend from '../components/DashboardFrontend.vue';
 import AdminDashboard from '../components/AdminDashboard.vue';
+import OrderSuccess from '../views/OrderSuccess.vue'; // Import the OrderSuccess component
 
 const routes = [
   { path: '/', name: 'Home', component: HomeFrontend },
@@ -29,6 +30,7 @@ const routes = [
     component: AdminDashboard,
     meta: { requiresAuth: true, requiresAdmin: true }, // Admin role required
   },
+  { path: '/order-success', name: 'OrderSuccess', component: OrderSuccess }, // Add the OrderSuccess route
 ];
 
 const router = createRouter({

@@ -1,5 +1,3 @@
-<!-- components/CheckoutFrontend.vue -->
-
 <template>
   <div class="checkout-page">
     <h1>Checkout</h1>
@@ -76,57 +74,7 @@
                 <option value="US">United States</option>
                 <option value="CA">Canada</option>
                 <option value="GB">United Kingdom</option> 
-                <!-- Add more countries as needed -->
-               </select>
-            </div>
-          </section>
-
-          <!-- Payment Information -->
-          <section class="form-section">
-            <h2>Payment Information</h2>
-            <div class="form-group">
-              <label for="cardName">Name on Card</label>
-              <input 
-                type="text" 
-                id="cardName" 
-                v-model="formData.cardName"
-                required
-              >
-            </div>
-            <div class="form-group">
-              <label for="cardNumber">Card Number</label>
-              <input 
-                type="text" 
-                id="cardNumber" 
-                v-model="formData.cardNumber"
-                required
-                pattern="\d{16}"
-                placeholder="1234 5678 9012 3456"
-              >
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="expiryDate">Expiry Date</label>
-                <input 
-                  type="text" 
-                  id="expiryDate" 
-                  v-model="formData.expiryDate"
-                  required
-                  pattern="\d{2}/\d{2}"
-                  placeholder="MM/YY"
-                >
-              </div>
-              <div class="form-group">
-                <label for="cvv">CVV</label>
-                <input 
-                  type="text" 
-                  id="cvv" 
-                  v-model="formData.cvv"
-                  required
-                  pattern="\d{3}"
-                  placeholder="123"
-                >
-              </div>
+              </select>
             </div>
           </section>
 
@@ -158,6 +106,9 @@
             <span>${{ total.toFixed(2) }}</span>
           </div>
         </div>
+
+        <!-- PayPal Button -->
+        <div id="paypal-button-container"></div>
       </div>
     </div>
   </div>
@@ -181,13 +132,12 @@ export default defineComponent({
       city: '',
       postalCode: '',
       country: '',
-      cardName: '',
-      cardNumber: '',
-      expiryDate: '',
-      cvv: ''
     });
 
-    const shipping = computed(() => cartStore.totalPrice > 100 ? 0 : 10);
+    // Compute shipping cost based on total price
+    const shipping = computed(() => (cartStore.totalPrice > 100 ? 0 : 10));
+
+    // Compute total cost as a number
     const total = computed(() => cartStore.totalPrice + shipping.value);
 
     const handleSubmit = async () => {
@@ -195,25 +145,55 @@ export default defineComponent({
         if (cartStore.items.length === 0) {
           throw new Error('Cannot submit order with an empty cart');
         }
+
+        // Log order details for submission
         console.log('Order submitted:', { 
           formData: formData.value, 
-          orderTotal: total.value,
+          orderTotal: total.value.toFixed(2), // Format as a string
           items: cartStore.items
         });
-        
-        // Here you would typically send the order to your backend
-        // await api.post('/orders', { ...formData.value, items: cartStore.items, total: total.value });
-        
+
+        // Call your backend API to save the order here if necessary
+
         await cartStore.clearCart();
         router.push('/order-success');
       } catch (error) {
         console.error('Error processing order:', error);
-        // Here you might want to show an error message to the user
       }
+    };
+
+    // PayPal Button rendering logic
+    const loadPayPalButton = () => {
+      window.paypal.Buttons({
+        createOrder: (data, actions) => {
+          return actions.order.create({
+            purchase_units: [{
+              amount: {
+                value: total.value.toFixed(2) // Use the computed total value as a string
+              }
+            }]
+          });
+        },
+        onApprove: (data, actions) => {
+          return actions.order.capture().then((details) => {
+            alert('Transaction completed by ' + details.payer.name.given_name);
+            handleSubmit(); // Call handleSubmit to clear cart and redirect
+          });
+        },
+        onError: (err) => {
+          console.error('PayPal Checkout Error:', err);
+        }
+      }).render('#paypal-button-container');
     };
 
     onMounted(async () => {
       await cartStore.fetchCart();
+
+      // Ensure PayPal script is loaded
+      const paypalScript = document.createElement('script');
+      paypalScript.src = "https://www.paypal.com/sdk/js?client-id=AceJUHWaafcPScT9WEkm0eDlocn_7QBvYEH2xHX0dOIcqCIopSWz9WaQYzglzSuD0XNmtLQ5sAXkuC9c"; // Replace with your actual PayPal client ID
+      paypalScript.onload = loadPayPalButton;
+      document.body.appendChild(paypalScript);
     });
 
     return {
@@ -325,4 +305,4 @@ export default defineComponent({
       gap: 0;
     }
   }
-  </style>
+</style>

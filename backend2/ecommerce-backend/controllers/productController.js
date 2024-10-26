@@ -1,6 +1,8 @@
 // controllers/productController.js
 
 const db = require('../config/db');
+const { Product } = require('../models'); // Adjust according to your project structure
+
 exports.getAllProducts = async (req, res) => {
   console.log('Getting all products');
   try {
@@ -38,20 +40,30 @@ exports.getAllProducts = async (req, res) => {
 
 exports.getProductById = async (req, res) => {
   const { id } = req.params;
+  console.log(`ID from params: ${id}`);
   console.log(`Getting product with id: ${id}`);
+
+  // Validate ID
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+
   try {
-    const result = await db.query('SELECT * FROM "Products" WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
+    // Use Sequelize to find the product by primary key (id)
+    const product = await Product.findByPk(id);
+    if (!product) {
       console.log(`Product with id ${id} not found`);
       return res.status(404).json({ error: 'Product not found' });
     }
-    console.log(`Found product: ${JSON.stringify(result.rows[0])}`);
-    res.json(result.rows[0]);
+    console.log(`Found product: ${JSON.stringify(product)}`);
+    res.json(product);
   } catch (err) {
     console.error(`Error getting product with id ${id}:`, err);
     res.status(500).json({ error: 'Failed to fetch product' });
   }
 };
+
+
 
 exports.createProduct = async (req, res) => {
   const { name, description, price } = req.body;

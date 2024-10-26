@@ -6,6 +6,8 @@ import api from '../services/api';
 export const useProductStore = defineStore('products', {
   state: () => ({
     products: [],
+    currentProduct: null,
+    reviews: [],
     loading: false,
     error: null,
   }),
@@ -35,6 +37,42 @@ export const useProductStore = defineStore('products', {
       }
     },
 
+    async fetchProduct(productId) {
+      console.log('Fetching product with ID:', productId);
+      this.loading = true;
+      this.error = null;
+      try {
+        const response = await api.get(`/products/${productId}`);
+        console.log('Product fetched:', response.data);
+        this.currentProduct = response.data;
+        return this.currentProduct;
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        this.error = error.response?.data?.message || 'Failed to load product';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async fetchReviews(productId) {
+      console.log('Fetching reviews for product ID:', productId);
+      this.loading = true;
+      this.error = null;
+      try {
+        const response = await api.get(`/products/${productId}/reviews`);
+        console.log('Reviews fetched:', response.data);
+        this.reviews = response.data;
+        return this.reviews;
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+        this.error = error.response?.data?.message || 'Failed to load reviews';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+
     clearProducts() {
       this.products = [];
       this.error = null;
@@ -48,6 +86,8 @@ export const useProductStore = defineStore('products', {
 
   getters: {
     getProducts: (state) => state.products,
+    getCurrentProduct: (state) => state.currentProduct,
+    getReviews: (state) => state.reviews,
     isLoading: (state) => state.loading,
     getError: (state) => state.error,
   },

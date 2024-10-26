@@ -44,8 +44,8 @@ db.Category.hasMany(db.Product, {
   foreignKey: 'categoryId' 
 });
 
-db.Product.hasMany(db.Review);
-db.Review.belongsTo(db.Product);
+db.Product.hasMany(db.Review, { foreignKey: 'productId' });
+db.Review.belongsTo(db.Product, { foreignKey: 'productId' });
 
 db.User.hasMany(db.Order, { foreignKey: 'userId' });
 db.Order.belongsTo(db.User, { foreignKey: 'userId' });
