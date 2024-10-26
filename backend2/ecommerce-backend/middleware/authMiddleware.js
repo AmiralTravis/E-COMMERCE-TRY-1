@@ -1,11 +1,33 @@
-// // ecommerce-backend/middleware/authMiddleware.js
+// // // ecommerce-backend/middleware/authMiddleware.js
 
 const jwt = require('jsonwebtoken');
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET;
 
+// Define public paths that don't require authentication
+const publicPaths = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/products',
+  '/categories',
+  '/products/:id',
+  '/products/:productId/reviews'
+];
+
 const authenticateToken = (req, res, next) => {
+  console.log('=== Auth Middleware ===');
+  console.log('Path:', req.path);
+  console.log('Method:', req.method);
+  console.log('Headers:', req.headers);
+
+  // Skip authentication for public paths and OPTIONS requests
+  if (publicPaths.some(path => req.path.match(new RegExp(`^${path.replace(':id', '[^/]+')}$`))) || req.method === 'OPTIONS') {
+    console.log('Public path, skipping authentication.');
+    return next();
+  }
+
   console.log('Authenticating token...');
   const accessToken = req.cookies.accessToken;
   const refreshToken = req.cookies.refreshToken;

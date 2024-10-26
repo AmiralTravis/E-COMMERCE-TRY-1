@@ -1,4 +1,4 @@
-// // // models/productsModels.js
+// // models/productsModels.js
 
 module.exports = (sequelize, DataTypes) => {
   const Product = sequelize.define('Product', {
@@ -29,13 +29,6 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     timestamps: true,
-  });
-
-  Product.addHook('afterUpdate', async (product) => {
-    if (product.stock <= 10) {
-      // Send low stock alert (implement this functionality)
-      console.log(`Low stock alert for product ${product.id}: ${product.name}`);
-    }
   });
 
   return Product;

@@ -1,11 +1,13 @@
-const db = require('../config/db');
+const { Review } = require('../models'); // Adjust the import to your actual model file path
 
 // Get all reviews for a product
 exports.getReviewsByProduct = async (req, res) => {
   const { productId } = req.params;
   try {
-    const result = await db.query('SELECT * FROM reviews WHERE product_id = $1', [productId]);
-    res.json(result.rows);
+    const reviews = await Review.findAll({
+      where: { productId: productId },
+    });
+    res.json(reviews);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch reviews' });
@@ -16,12 +18,15 @@ exports.getReviewsByProduct = async (req, res) => {
 exports.addReview = async (req, res) => {
   const { productId } = req.params;
   const { userId, rating, comment } = req.body;
+
   try {
-    const result = await db.query(
-      'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING *',
-      [productId, userId, rating, comment]
-    );
-    res.status(201).json(result.rows[0]);
+    const newReview = await Review.create({
+      productId,
+      userId,
+      rating,
+      comment,
+    });
+    res.status(201).json(newReview);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create review' });
@@ -32,15 +37,18 @@ exports.addReview = async (req, res) => {
 exports.updateReview = async (req, res) => {
   const { id } = req.params;
   const { rating, comment } = req.body;
+
   try {
-    const result = await db.query(
-      'UPDATE reviews SET rating = $1, comment = $2 WHERE id = $3 RETURNING *',
-      [rating, comment, id]
-    );
-    if (result.rows.length === 0) {
+    const review = await Review.findByPk(id);
+    if (!review) {
       return res.status(404).json({ error: 'Review not found' });
     }
-    res.json(result.rows[0]);
+
+    review.rating = rating;
+    review.comment = comment;
+    await review.save();
+
+    res.json(review);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update review' });
@@ -50,9 +58,12 @@ exports.updateReview = async (req, res) => {
 // Delete a review
 exports.deleteReview = async (req, res) => {
   const { id } = req.params;
+
   try {
-    const result = await db.query('DELETE FROM reviews WHERE id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) {
+    const result = await Review.destroy({
+      where: { id: id },
+    });
+    if (result === 0) {
       return res.status(404).json({ error: 'Review not found' });
     }
     res.status(204).send();
