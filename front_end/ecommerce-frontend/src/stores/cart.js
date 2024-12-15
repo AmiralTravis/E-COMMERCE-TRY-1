@@ -221,11 +221,74 @@ export const useCartStore = defineStore('cart', {
       }
     },
 
-    clearCart() {
-      this.items = [];
-      if (!useAuthStore().isAuthenticated) {
+    // clearCart() {
+    //   this.items = [];
+    //   if (!useAuthStore().isAuthenticated) {
+    //     localStorage.removeItem('cart');
+    //   }
+    // }
+    // Add this new action to your cart store
+    // async clearCartAfterOrder() {
+    //   const authStore = useAuthStore();
+    //   this.loading = true;
+    //   this.error = null;
+
+    //   try {
+    //     // If user is authenticated, clear cart on the backend
+    //     if (authStore.isAuthenticated) {
+    //       // You'll need to implement this endpoint in your Node.js backend
+    //       await api.delete('/cart/clear');
+    //     }
+        
+    //     // Clear frontend state
+    //     this.items = [];
+        
+    //     // Clear localStorage if it exists
+    //     localStorage.removeItem('cart');
+        
+    //     console.log('Cart cleared after order placement');
+    //   } catch (error) {
+    //     console.error('Error clearing cart after order:', error);
+    //     this.error = 'Failed to clear cart';
+        
+    //     if (error.response?.status === 401) {
+    //       await authStore.refreshToken();
+    //       return this.clearCartAfterOrder();
+    //     }
+    //   } finally {
+    //     this.loading = false;
+    //   }
+    // }  
+    async clearCart() {
+      const authStore = useAuthStore();
+      this.loading = true;
+      this.error = null;
+    
+      try {
+        // If user is authenticated, clear cart on the backend
+        if (authStore.isAuthenticated) {
+          await api.delete('/cart');
+        }
+        
+        // Clear frontend state
+        this.items = [];
+        
+        // Clear localStorage if it exists
         localStorage.removeItem('cart');
+        
+        console.log('Cart cleared after order placement');
+      } catch (error) {
+        console.error('Error clearing cart after order:', error);
+        this.error = 'Failed to clear cart';
+        
+        if (error.response?.status === 401) {
+          await authStore.refreshToken();
+          return this.clearCartAfterOrder();
+        }
+      } finally {
+        this.loading = false;
       }
     }
+  
   }
 });

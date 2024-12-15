@@ -1,5 +1,4 @@
-// // models/productsModels.js
-
+// models/productModel.js
 module.exports = (sequelize, DataTypes) => {
   const Product = sequelize.define('Product', {
     name: {
@@ -19,17 +18,19 @@ module.exports = (sequelize, DataTypes) => {
     stock: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
-    },
-    categoryId: {
-      type: DataTypes.INTEGER,
-      references: {
-        model: 'Categories',
-        key: 'id',
-      },
-    },
+    }
+    
   }, {
     timestamps: true,
   });
 
+  // Associations  
+  Product.associate = (models) => {
+    Product.hasMany(models.OrderItems, {
+      foreignKey: 'productId',
+      onDelete: 'CASCADE',
+    });
+  };
+  
   return Product;
 };

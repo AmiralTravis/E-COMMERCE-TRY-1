@@ -14,6 +14,7 @@ import Login from '../components/LogIn.vue';
 import DashboardFrontend from '../components/DashboardFrontend.vue';
 import AdminDashboard from '../components/AdminDashboard.vue';
 import OrderSuccess from '../views/OrderSuccess.vue'; // Import the OrderSuccess component
+import PaymentPage from '@/components/PaymentPage.vue';
 
 const routes = [
   { path: '/', name: 'Home', component: HomeFrontend },
@@ -24,11 +25,20 @@ const routes = [
   { path: '/signup', name: 'SignUp', component: SignUp },
   { path: '/login', name: 'Login', component: Login },
   { path: '/dashboard', name: 'Dashboard', component: DashboardFrontend, meta: { requiresAuth: true } },
+  { path: '/profile', component: () => import('@/components/UserProfile.vue')},
+  { path: '/orders', component: () => import('@/components/OrdersPage.vue')},
+  { path: '/wishlist', component: () => import('@/components/WishlistPage.vue')},
   {
     path: '/admin',
     name: 'Admin',
     component: AdminDashboard,
     meta: { requiresAuth: true, requiresAdmin: true }, // Admin role required
+  },
+  {
+    path: '/payment',
+    name: 'PaymentPage',
+    component: PaymentPage,
+    meta: { requiresAuth: true }
   },
   { path: '/order-success', name: 'OrderSuccess', component: OrderSuccess }, // Add the OrderSuccess route
 ];

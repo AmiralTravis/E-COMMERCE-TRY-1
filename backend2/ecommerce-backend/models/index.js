@@ -1,8 +1,8 @@
-// models/index.js
+// ecommerce-backend/models/index.js
 const fs = require('fs');
 const path = require('path');
 const Sequelize = require('sequelize');
-const config = require('../config/config.js');
+const config = require('../config/database.js');
 
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
@@ -37,11 +37,13 @@ db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
 // Define relationships
-db.Product.belongsTo(db.Category, {
-  foreignKey: 'categoryId' 
+db.Product.belongsToMany(db.Category, { 
+  through: db.ProductCategory,
+  foreignKey: 'productId'
 });
-db.Category.hasMany(db.Product, { 
-  foreignKey: 'categoryId' 
+db.Category.belongsToMany(db.Product, { 
+  through: db.ProductCategory,
+  foreignKey: 'categoryId'
 });
 
 db.Product.hasMany(db.Review, { foreignKey: 'productId' });
@@ -73,7 +75,15 @@ db.User.belongsToMany(db.Product, { through: db.Wishlist });
 db.Order.hasMany(db.Payment);
 db.Payment.belongsTo(db.Order);
 
-db.User.hasMany(db.Address);
-db.Address.belongsTo(db.User);
+db.User.hasMany(db.UserAddress, { foreignKey: 'userId' });
+db.UserAddress.belongsTo(db.User, { foreignKey: 'userId' });
+
+
+// Add these with your other associations in index.js
+db.Order.hasMany(db.OrderItems, { foreignKey: 'orderId' });
+db.OrderItems.belongsTo(db.Order, { foreignKey: 'orderId' });
+
+db.Product.hasMany(db.OrderItems, { foreignKey: 'productId' });
+db.OrderItems.belongsTo(db.Product, { foreignKey: 'productId' });
 
 module.exports = db;

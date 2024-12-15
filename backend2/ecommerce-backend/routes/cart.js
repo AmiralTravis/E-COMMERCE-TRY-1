@@ -48,6 +48,12 @@ router.put('/:cartItemId', async (req, res) => {
   }
 });
 
+// Clear entire cart
+router.delete('/', async (req, res) => {
+  console.log('Received DELETE request to clear entire cart...');
+  await cartController.clearCart(req, res);
+});
+
 // Remove an item from the cart
 router.delete('/:cartItemId', async (req, res) => {
   console.log('Received DELETE request to remove item from cart...');
@@ -61,5 +67,6 @@ router.delete('/:cartItemId', async (req, res) => {
     res.status(500).json({ message: 'An error occurred while removing the item from the cart' });
   }
 });
+
 
 module.exports = router;

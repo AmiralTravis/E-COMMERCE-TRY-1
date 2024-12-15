@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { client } = require('../paypalClient'); // Import the PayPal client
 const paypal = require('@paypal/checkout-server-sdk');
+// ------------
+const { verifyPaypalOrder } = require('../controllers/paypalController');
+const {authenticateToken} = require('../middleware/authMiddleware');
+
+router.post('/verify-order', authenticateToken, verifyPaypalOrder);
 
 // Create PayPal Order
 router.post('/create-order', async (req, res) => {

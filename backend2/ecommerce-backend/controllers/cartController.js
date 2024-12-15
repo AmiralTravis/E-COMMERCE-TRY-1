@@ -123,3 +123,27 @@ exports.removeFromCart = async (req, res) => {
     res.status(500).json({ message: 'Failed to remove item from cart' });
   }
 };
+
+exports.clearCart = async (req, res) => {
+  console.log('Entering clearCart method...');
+
+  try {
+    const userId = req.user.id;
+    console.log(`Clearing cart for User ID: ${userId}`);
+    
+    const result = await Cart.destroy({
+      where: { userId }
+    });
+
+    if (!result) {
+      console.log('No cart items found to clear.');
+      return res.status(404).json({ message: 'No cart items found' });
+    }
+
+    console.log('Successfully cleared cart.');
+    res.status(204).send();
+  } catch (error) {
+    console.error('Clear cart error:', error);
+    res.status(500).json({ message: 'Failed to clear cart' });
+  }
+};
