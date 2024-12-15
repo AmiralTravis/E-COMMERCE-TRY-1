@@ -1,3 +1,23 @@
+// // paypalClient.js
+// const paypal = require('@paypal/checkout-server-sdk');
+
+// function environment() {
+//   let clientId = process.env.PAYPAL_CLIENT_ID;
+//   let clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+//   if (process.env.PAYPAL_MODE === 'live') {
+//     return new paypal.core.LiveEnvironment(clientId, clientSecret);
+//   } else {
+//     return new paypal.core.SandboxEnvironment(clientId, clientSecret);
+//   }
+// }
+
+// function client() {
+//   return new paypal.core.PayPalHttpClient(environment());
+// }
+
+// module.exports = { client };
+
+// paypalClient.js
 const paypal = require('@paypal/checkout-server-sdk');
 
 function environment() {
@@ -14,4 +34,7 @@ function client() {
   return new paypal.core.PayPalHttpClient(environment());
 }
 
-module.exports = { client };
+module.exports = { 
+  client,
+  orders: paypal.orders  // Add this line
+};

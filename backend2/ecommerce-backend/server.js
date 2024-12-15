@@ -158,7 +158,7 @@ app.use('/api/addresses', addressRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/paypal', paypalRoutes); // Apply PayPal routes
+app.use('/api/paypal', paypalRoutes); // Apply PayPal routes
 app.use('/api', captureOrderRoute); // Use your route under a specific path
 
 // Root route
@@ -203,5 +203,13 @@ process.on('SIGTERM', () => {
     });
   });
 });
+
+const ReceiptCleanup = require('./utils/receiptCleanup');
+
+// Initialize cleanup utility
+const receiptCleanup = new ReceiptCleanup();
+
+// Start scheduled cleanup (runs every 12 hours by default)
+receiptCleanup.startScheduledCleanup();
 
 module.exports = app;

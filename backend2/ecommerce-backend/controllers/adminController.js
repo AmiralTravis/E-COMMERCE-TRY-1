@@ -212,7 +212,7 @@ exports.getSalesReport = async (req, res) => {
         status: 'completed'
       },
       attributes: [
-        [db.fn('SUM', db.col('total')), 'totalSales'],
+        [db.fn('SUM', db.col('totalAmount')), 'totalSales'],
         [db.fn('COUNT', db.col('id')), 'orderCount']
       ]
     });
@@ -305,20 +305,6 @@ exports.refundOrder = async (req, res) => {
 
 
 // Function to get all admin users
-// exports.getAllAdmins = async (req, res) => {
-//   try {
-//     const admins = await User.findAll({
-//       where: {
-//         role: 'admin'
-//       },
-//       attributes: ['id', 'username', 'email', 'role']
-//     });
-//     res.json(admins);
-//   } catch (err) {
-//     console.error('Error fetching admins:', err);
-//     res.status(500).json({ error: 'Failed to fetch admins' });
-//   }
-// };
 exports.getAllAdmins = async (req, res) => {
   try {
     let admins;

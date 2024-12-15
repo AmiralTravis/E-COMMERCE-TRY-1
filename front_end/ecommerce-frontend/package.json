@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "@algolia/autocomplete-js": "^1.17.7",
+    "@algolia/client-search": "^5.15.0",
+    "algoliasearch": "^5.15.0",
     "axios": "^1.4.0",
     "body-parser": "^1.20.2",
     "dotenv": "^16.4.5",

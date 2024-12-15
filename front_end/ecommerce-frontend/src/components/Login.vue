@@ -27,6 +27,7 @@
       </button>
     </form>
     <p v-if="error" class="error-message">{{ error }}</p>
+    <p>Don't have an account? <router-link to="/signup">Sign Up</router-link></p>
   </div>
 </template>
 
@@ -64,8 +65,8 @@ export default {
         console.log('Login response:', response);
         
         if (authStore.token) {
-          console.log('Token received, redirecting to checkout');
-          this.$router.push('/checkout');
+          console.log('Token received, redirecting to Homepage');
+          this.$router.push('/');
         } else {
           console.error('No token received after login');
           this.error = 'Login failed - no token received';

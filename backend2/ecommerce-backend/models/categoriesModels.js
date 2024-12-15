@@ -1,5 +1,4 @@
-// // models/categoriesModels.js
-
+// models/categoryModel.js
 module.exports = (sequelize, DataTypes) => {
   const Category = sequelize.define('Category', {
     name: {
