@@ -3,7 +3,7 @@ const db = require('../config/db');
 // Get all categories
 exports.getAllCategories = async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM categories');
+    const result = await db.query('SELECT * FROM "Categories"');
     res.json(result.rows);
   } catch (err) {
     console.error(err);

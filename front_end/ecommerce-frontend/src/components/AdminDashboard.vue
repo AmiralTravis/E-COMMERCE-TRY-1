@@ -44,7 +44,10 @@
           <button @click="refundOrder(order.id)" v-if="order.status === 'completed'">Refund Order</button>
         </li>
       </ul>
-
+      <nav>
+        <router-link to="/admin/orders">Manage Orders</router-link>
+        <!-- Other admin navigation links -->
+      </nav>
       <!-- Sales Report Section -->
       <h2>Sales Report</h2>
       <select v-model="reportPeriod" @change="generateSalesReport">

@@ -1,17 +1,20 @@
 // controllers/orderController.js
 const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
-const { Order } = require('../models');  // Adjust path as needed
+const { Order, OrderItems, Product } = require('../models');  // Adjust path as needed
 const { createOrderItems } = require('../services/orderItemService');
+const { createVerifiedPurchases } = require('../services/verifiedPurchaseService');
+
 const { 
   sendOrderConfirmationEmail, 
-  sendDeliveryNotificationEmail 
+  sendDeliveryNotificationEmail
 } = require('../utils/emailService');
-// const { Op } = require('sequelize');
+const { Op } = require('sequelize');
 const sequelize = require('../config/db');
 
 const ReceiptService = require('../services/receiptService');
 const nodemailer = require('nodemailer');
+const logger = require('../utils/Logger');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -27,26 +30,44 @@ const receiptService = new ReceiptService(transporter);
 // Get all orders (Admin only)
 exports.getAllOrders = async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM orders');
+    const result = await db.query('SELECT * FROM "Orders"');
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    res.status(500).json({ error: 'Failed to fetch "Orders"' });
   }
 };
 
 // Get a single order by ID
 exports.getOrderById = async (req, res) => {
   const { id } = req.params;
+  
+  // Validate ID is a number
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({ error: 'Invalid munna order ID' });
+  }
+
   try {
-    const result = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
+    const order = await Order.findByPk(Number(id), {
+      include: [
+        {
+          model: OrderItems,
+          include: [Product]
+        }
+      ]
+    });
+
+    if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    res.json(result.rows[0]);
+
+    res.json(order);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch order' });
+    res.status(500).json({ 
+      error: 'Failed to fetch order', 
+      details: err.message 
+    });
   }
 };
 
@@ -181,6 +202,9 @@ exports.updateOrderStatus = async (req, res) => {
 };
 
 
+
+
+
 exports.processPayPalOrder = async (req, res) => {
   try {
     // Your existing PayPal order verification logic
@@ -202,3 +226,162 @@ exports.processPayPalOrder = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
+
+
+exports.getCurrentUserOrders = async (req, res) => {
+  try {
+    const currentOrders = await Order.findAll({
+      where: {
+        userId: req.user.id,
+        status: {
+          [Op.notIn]: ['Delivered', 'Cancelled']
+        }
+      },
+      include: [
+        {
+          model: OrderItems,
+          include: [
+            {
+              model: Product,
+              attributes: ['id', 'name', 'price', 'imageUrl']
+            }
+          ]
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json({
+      orders: currentOrders,
+      total: currentOrders.length
+    });
+  } catch (error) {
+    console.error('Error fetching current orders:', error);
+    res.status(500).json({
+      error: 'Failed to fetch current orders',
+      message: error.message
+    });
+  }
+};
+
+// Updated to handle completed (delivered) orders with pagination
+exports.getCompletedOrders = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Authentication required'
+    });
+  }
+
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 10);
+    const offset = (page - 1) * limit;
+
+    const { count, rows: completedOrders } = await Order.findAndCountAll({
+      where: {
+        userId: req.user.id,
+        status: 'Delivered'
+      },
+      include: [
+        {
+          model: OrderItems,
+          include: [
+            {
+              model: Product,
+              attributes: ['id', 'name', 'price', 'imageUrl']
+            }
+          ]
+        }
+      ],
+      order: [['updatedAt', 'DESC']],
+      limit,
+      offset,
+      distinct: true
+    });
+
+    res.json({
+      orders: completedOrders,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit)
+    });
+  } catch (error) {
+    console.error('Error fetching completed orders:', error);
+    res.status(500).json({
+      error: 'Failed to fetch completed orders',
+      message: error.message
+    });
+  }
+};
+
+// Keep only this version of getUserOrderHistory (deprecated - use getCompletedOrders instead)
+exports.getUserOrderHistory = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    logger.error('Unauthorized access: No user ID found');
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Authentication required'
+    });
+  }
+
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 50);
+    const offset = (page - 1) * limit;
+
+    const { count, rows: orderHistory } = await Order.findAndCountAll({
+      where: {
+        userId: Number(req.user.id),
+        status: {
+          [Op.in]: ['Delivered', 'Cancelled']
+        }
+      },
+      include: [
+        {
+          model: OrderItems,
+          include: [Product],
+          required: false
+        }
+      ],
+      order: [['updatedAt', 'DESC']],
+      limit,
+      offset,
+      distinct: true
+    });
+
+    if (count === 0) {
+      return res.json({
+        message: 'No order history found',
+        orders: [],
+        total: 0,
+        page: 1,
+        totalPages: 0
+      });
+    }
+
+    res.json({
+      orders: orderHistory,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit)
+    });
+  } catch (error) {
+    logger.error('Error in getUserOrderHistory', {
+      userId: req.user.id,
+      errorName: error.name,
+      errorMessage: error.message
+    });
+
+    res.status(500).json({ 
+      error: 'Server Error',
+      message: 'Failed to fetch order history'
+    });
+  }
+};
+
+
+
+module.exports = exports;

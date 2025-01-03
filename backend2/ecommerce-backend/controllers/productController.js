@@ -1,7 +1,9 @@
 // controllers/productController.js
 
 const db = require('../config/db');
-const { Product } = require('../models'); // Adjust according to your project structure
+const { Product, Category,ProductCategory, Review, sequelize } = require('../models'); // Adjust according to your project structure
+const { Op } = require('sequelize');
+// const sequelize = db.sequelize; 
 
 exports.getAllProducts = async (req, res) => {
   console.log('Getting all products');
@@ -117,21 +119,267 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
+
+// exports.searchProducts = async (req, res) => {
+//   try {
+//     const { 
+//       query,
+//       minPrice,
+//       maxPrice,
+//       minRating,
+//       categories,
+//       limit = 15, // Default limit to 15
+//       page = 1
+//     } = req.query;
+
+//     const offset = (page - 1) * limit;
+
+//     // Base query options
+//     // const queryOptions = {
+//     //   include: [
+//     //     {
+//     //       model: Category,
+//     //       through: ProductCategory,
+//     //       attributes: ['id', 'name']
+//     //     },
+//     //     {
+//     //       model: Review, // Include the Review model
+//     //       attributes: [], // No need to fetch review details
+//     //     }
+//     //   ],
+//     //   where: {},
+//     //   limit: parseInt(limit),
+//     //   offset: parseInt(offset),
+//     //   attributes: {
+//     //     include: [
+//     //       [sequelize.fn('COUNT', sequelize.col('Reviews.id')), 'reviewCount'] // Count reviews
+//     //     ]
+//     //   },
+//     //   group: ['Product.id'], // Group by product ID
+//     //   subQuery: false // Disable subqueries to avoid issues with GROUP BY
+//     // };
+//     const queryOptions = {
+//       include: [
+//         {
+//           model: Category,
+//           through: ProductCategory,
+//           attributes: ['id', 'name']
+//         },
+//         {
+//           model: Review, // Include the Review model
+//           attributes: [], // No need to fetch review details
+//         }
+//       ],
+//       where: {},
+//       limit: parseInt(limit),
+//       offset: parseInt(offset),
+//       attributes: {
+//         include: [
+//           [sequelize.fn('COUNT', sequelize.col('Reviews.id')), 'reviewCount'] // Count reviews
+//         ]
+//       },
+//       group: [
+//         'Product.id', // Group by product ID
+//         'Categories.id', // Group by category ID
+//         'Categories->ProductCategory.productId', // Group by join table column
+//         'Categories->ProductCategory.categoryId' // Group by join table column
+//       ],
+//       subQuery: false // Disable subqueries to avoid issues with GROUP BY
+//     };
+
+//     // Apply search filters
+//     if (query) {
+//       queryOptions.where[Op.or] = [
+//         { 
+//           name: {
+//             [Op.iLike]: `%${query}%`
+//           }
+//         },
+//         {
+//           description: {
+//             [Op.iLike]: `%${query}%`
+//           }
+//         }
+//       ];
+//     }
+
+//     // Price range filter
+//     if (minPrice || maxPrice) {
+//       queryOptions.where.price = {};
+//       if (minPrice) queryOptions.where.price[Op.gte] = minPrice;
+//       if (maxPrice) queryOptions.where.price[Op.lte] = maxPrice;
+//     }
+
+//     // Rating filter
+//     if (minRating) {
+//       queryOptions.where.avgRating = {
+//         [Op.gte]: minRating
+//       };
+//     }
+
+//     // Category filter
+//     if (categories) {
+//       const categoryIds = categories.split(',').map(Number);
+//       queryOptions.include[0].where = {
+//         id: {
+//           [Op.in]: categoryIds
+//         }
+//       };
+//     }
+
+//     const { count, rows } = await Product.findAndCountAll(queryOptions);
+
+//     // Calculate total pages
+//     const totalPages = Math.ceil(count.length / limit);
+
+//     res.json({
+//       results: rows,
+//       total: count.length,
+//       page: parseInt(page),
+//       totalPages: totalPages
+//     });
+
+//   } catch (error) {
+//     console.error('Search error:', error);
+//     res.status(500).json({ error: 'Internal server error' });
+//   }
+// };
 exports.searchProducts = async (req, res) => {
-  const { query } = req.query;
-  console.log(`Searching for products with query: ${query}`);
   try {
-    const result = await db.query(
-      'SELECT * FROM "Products" WHERE name ILIKE :searchTerm OR description ILIKE :searchTerm',
-      {
-        replacements: { searchTerm: `%${query}%` },
-        type: db.QueryTypes.SELECT
-      }
-    );
-    console.log(`Found ${result.length} products matching the search query`);
-    res.json(result);
-  } catch (err) {
-    console.error('Error searching products:', err);
-    res.status(500).json({ error: 'Failed to search products', details: err.message });
+    const { 
+      query,
+      minPrice,
+      maxPrice,
+      minRating,
+      categories,
+      limit = 15, // Ensure this is 15
+      page = 1
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+
+    // Base query options
+    const queryOptions = {
+      include: [
+        {
+          model: Category,
+          through: {
+            attributes: [] // Exclude join table columns from the result
+          },
+          attributes: ['id', 'name']
+        },
+        {
+          model: Review, // Include the Review model
+          attributes: [], // No need to fetch review details
+        }
+      ],
+      where: {},
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      attributes: {
+        include: [
+          [sequelize.fn('COUNT', sequelize.col('Reviews.id')), 'reviewCount'] // Count reviews
+        ]
+      },
+      group: ['Product.id', 'Categories.id'], // Group by product ID and category ID
+      subQuery: false // Disable subqueries to avoid issues with GROUP BY
+    };
+
+    // Apply search filters
+    if (query) {
+      queryOptions.where[Op.or] = [
+        { 
+          name: {
+            [Op.iLike]: `%${query}%`
+          }
+        },
+        {
+          description: {
+            [Op.iLike]: `%${query}%`
+          }
+        },
+        // Include category names in the search
+        {
+          '$Categories.name$': {
+            [Op.iLike]: `%${query}%`
+          }
+        }
+      ];
+    }
+
+    // Price range filter
+    if (minPrice || maxPrice) {
+      queryOptions.where.price = {};
+      if (minPrice) queryOptions.where.price[Op.gte] = minPrice;
+      if (maxPrice) queryOptions.where.price[Op.lte] = maxPrice;
+    }
+
+    // Rating filter
+    if (minRating) {
+      queryOptions.where.avgRating = {
+        [Op.gte]: minRating
+      };
+    }
+
+    // Category filter
+    if (categories) {
+      const categoryIds = categories.split(',').map(Number);
+      queryOptions.include[0].where = {
+        id: {
+          [Op.in]: categoryIds
+        }
+      };
+    }
+
+    const { count, rows } = await Product.findAndCountAll(queryOptions);
+
+    // Calculate total pages
+    const totalPages = Math.ceil(count.length / limit);
+
+    res.json({
+      results: rows,
+      total: count.length,
+      page: parseInt(page),
+      totalPages: totalPages
+    });
+
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// controllers/productController.js
+exports.getSuggestions = async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+
+    const suggestions = await Product.findAll({
+      where: {
+        [Op.or]: [
+          { name: { [Op.iLike]: `%${query}%` } },
+          { description: { [Op.iLike]: `%${query}%` } }
+        ]
+      },
+      include: [{
+        model: Category,
+        through: ProductCategory,
+        attributes: ['name']
+      }],
+      limit: 6
+    });
+
+    res.json(suggestions.map(product => ({
+      id: product.id,
+      name: product.name,
+      category: product.Categories[0]?.name || 'General'
+    })));
+  } catch (error) {
+    console.error('Suggestions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -1,239 +1,275 @@
-   <!-- <template>
-    <div>
-      <h1 v-if="!loading && !error">{{ product?.name }}</h1>
-      <div v-if="loading">Loading...</div>
-      <div v-if="error">{{ error }}</div>
-      <p v-if="!loading && !error">{{ product?.description }}</p>
-      <p v-if="!loading && !error">Price: ${{ product?.price }}</p>
-      <button v-if="!loading && !error" @click="handleAddToCart(product)">Add to Cart</button>
-    </div>
-  </template>
-  
-  <script setup>
-  import { onMounted, ref } from 'vue';
-  import { useRoute } from 'vue-router';
-  import { useProductStore } from '../stores/products';
-  import { useCartStore } from '../stores/cart';
-  
-  const route = useRoute();
-  const productStore = useProductStore();
-  const cartStore = useCartStore();
-  
-  const product = ref(null);
-  const loading = ref(true);
-  const error = ref(null);
-  
-  onMounted(async () => {
-    const productId = route.params.id;
-    try {
-      product.value = await productStore.fetchProductDetails(productId);
-    } catch (err) {
-      error.value = 'Failed to load product details';
-    } finally {
-      loading.value = false;
-    }
-  });
-  
-  const handleAddToCart = (product) => {
-    cartStore.addToCart(product);
-  };
-  </script> -->
-
-  <template>
-    <div class="product-details" v-if="product">
-      <div class="product-image">
-        <img :src="product.imageUrl" :alt="product.name">
-      </div>
-      <div class="product-info">
-        <h1>{{ product.name }}</h1>
-        <p class="price">${{ product.price.toFixed(2) }}</p>
-        <p class="description">{{ product.description }}</p>
-        <p class="stock" :class="{ 'low-stock': product.stock <= 10 }">
-          In stock: {{ product.stock }}
-        </p>
-        <div class="add-to-cart">
-          <input type="number" v-model.number="quantity" min="1" :max="product.stock">
-          <button @click="addToCart" :disabled="product.stock === 0">Add to Cart</button>
+<template>
+  <div v-if="product" class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Product Gallery and Info Container -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Product Gallery -->
+      <div class="relative">
+        <div 
+          class="relative h-[500px] border rounded-lg overflow-hidden"
+          @mousemove="handleZoom"
+          @mouseleave="isZoomed = false"
+        >
+          <img 
+            :src="selectedImage || product.imageUrl" 
+            :alt="product.name"
+            class="w-full h-full object-contain"
+            ref="mainImage"
+            :style="zoomStyle"
+          />
         </div>
-      </div>
-      <div class="reviews">
-        <h2>Customer Reviews</h2>
-        <div v-if="reviews.length">
-          <div v-for="review in reviews" :key="review.id" class="review">
-            <div class="rating">
-              {{ "★".repeat(review.rating) }}{{ "☆".repeat(5 - review.rating) }}
-            </div>
-            <p class="comment">{{ review.comment }}</p>
-            <p class="reviewer">By {{ review.userName }} on {{ formatDate(review.createdAt) }}</p>
+
+        <div class="mt-4 grid grid-cols-4 gap-4">
+          <div 
+            v-for="(image, index) in productImages" 
+            :key="index"
+            class="h-24 border rounded-lg overflow-hidden cursor-pointer hover:border-blue-500"
+            :class="{ 'border-blue-500': selectedImage === image }"
+            @click="selectedImage = image"
+          >
+            <img :src="image" :alt="`${product.name} view ${index + 1}`" class="w-full h-full object-cover" />
           </div>
         </div>
-        <p v-else>No reviews yet.</p>
+      </div>
+
+      <!-- Product Info -->
+      <div class="space-y-6">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">{{ product.name }}</h1>
+          <div class="mt-2 flex items-center gap-2">
+            <div class="flex items-center">
+              <div class="text-yellow-400">
+                {{ "★".repeat(Math.floor(averageRating)) }}
+                {{ "☆".repeat(5 - Math.floor(averageRating)) }}
+              </div>
+              <span class="ml-2 text-sm text-gray-600">({{ averageRating.toFixed(1) }} average)</span>
+            </div>
+            <span class="text-sm text-gray-500">|</span>
+            <span class="text-sm text-gray-600">{{ totalReviews }} reviews</span>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <p class="text-3xl font-bold text-gray-900">${{ product.price.toFixed(2) }}</p>
+          <p class="text-sm text-green-600">Free delivery</p>
+          <p class="text-sm text-gray-600">Expected delivery: {{ deliveryDate }}</p>
+        </div>
+
+        <div class="border-t border-b py-4">
+          <p class="text-sm text-gray-600">Sold by: <span class="font-medium text-gray-900">{{ product.seller || 'Official Store' }}</span></p>
+          <p class="mt-1 text-sm" :class="product.stock > 10 ? 'text-green-600' : 'text-orange-600'">
+            {{ product.stock > 10 ? 'In Stock' : `Only ${product.stock} left` }}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="w-24">
+            <input 
+              type="number" 
+              v-model.number="quantity" 
+              min="1" 
+              :max="product.stock"
+              class="w-full px-3 py-2 border rounded-lg"
+            >
+          </div>
+          <button 
+            @click="addToCart(product)"
+            :disabled="product.stock === 0"
+            class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            Add to Cart
+          </button>
+        </div>
+
+        <!-- Product Description -->
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold">Product Description</h2>
+          <p class="text-gray-600">{{ product.description }}</p>
+        </div>
+
+        <!-- Specifications -->
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold">Specifications</h2>
+          <div class="grid grid-cols-2 gap-4">
+            <div v-for="(spec, index) in specifications" :key="index" class="text-sm">
+              <span class="font-medium text-gray-900">{{ spec.label }}:</span>
+              <span class="ml-2 text-gray-600">{{ spec.value }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </template>
-  
-  <script>
-  // import { ref, onMounted } from 'vue'
-  // import { useProductStore } from '@/stores/products'
-  // import { useCartStore } from '@/stores/cart'
-  
-  // export default {
-  //   name: 'ProductDetails',
-  //   props: {
-  //     productId: {
-  //       type: Number,
-  //       required: true
-  //     }
-  //   },
-  //   setup(props) {
-  //     const productStore = useProductStore()
-  //     const cartStore = useCartStore()
-  //     const product = ref(null)
-  //     const reviews = ref([])
-  //     const quantity = ref(1)
-  
-  //     onMounted(async () => {
-  //       product.value = await productStore.fetchProduct(props.productId)
-  //       reviews.value = await productStore.fetchReviews(props.productId)
-  //     })
-  
-  //     const addToCart = () => {
-  //       cartStore.addToCart({
-  //         productId: product.value.id,
-  //         quantity: quantity.value
-  //       })
-  //     }
-  
-  //     const formatDate = (dateString) => {
-  //       return new Date(dateString).toLocaleDateString()
-  //     }
-  
-  //     return {
-  //       product,
-  //       reviews,
-  //       quantity,
-  //       addToCart,
-  //       formatDate
-  //     }
-  //   }
-  // }
-  import { ref, onMounted } from 'vue'
-  import { useRoute } from 'vue-router' // Import useRoute to access route params
-  import { useProductStore } from '@/stores/products'
-  import { useCartStore } from '@/stores/cart'
-  
-  export default {
-    name: 'ProductDetails',
-    setup() {
-      const route = useRoute() // Access the route object
-      const productId = route.params.id // Get the product ID from route params
-    
-      const productStore = useProductStore()
-      const cartStore = useCartStore()
-      const product = ref(null)
-      const reviews = ref([])
-      const quantity = ref(1)
-    
-      onMounted(async () => {
-        product.value = await productStore.fetchProduct(productId) // Use productId from the route
-        reviews.value = await productStore.fetchReviews(productId)
-      })
-    
-      const addToCart = () => {
-        cartStore.addToCart({
-          productId: product.value.id,
-          quantity: quantity.value
-        })
-      }
-    
-      const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString()
-      }
-    
-      return {
-        product,
-        reviews,
-        quantity,
-        addToCart,
-        formatDate
-      }
-    }
-  }
 
-  </script>
-  
-  <style scoped>
-  .product-details {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    display: flex;
-    flex-wrap: wrap;
+    <!-- Reviews Section -->
+    <div class="mt-16">
+      <h2 class="text-2xl font-bold mb-8">Ratings & Reviews</h2>
+      
+      <!-- Review Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+        <div class="space-y-2">
+          <div class="flex items-baseline gap-4">
+            <span class="text-5xl font-bold">{{ averageRating.toFixed(1) }}</span>
+            <div class="text-yellow-400 text-xl">
+              {{ "★".repeat(Math.floor(averageRating)) }}{{ "☆".repeat(5 - Math.floor(averageRating)) }}
+            </div>
+          </div>
+          <p class="text-sm text-gray-600">Based on {{ totalReviews }} reviews</p>
+        </div>
+        
+        <div class="col-span-2">
+          <div v-for="n in 5" :key="n" class="flex items-center gap-4 mb-2">
+            <span class="text-sm w-8">{{ 6-n }}★</span>
+            <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                class="h-full bg-yellow-400 rounded-full"
+                :style="`width: ${(ratingDistribution[6-n] / totalReviews * 100) || 0}%`"
+              ></div>
+            </div>
+            <span class="text-sm w-16">{{ ratingDistribution[6-n] || 0 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Review List -->
+      <div v-if="reviews.length > 0" class="space-y-6">
+        <div v-for="review in reviews" :key="review.id" class="border-b pb-6">
+          <div class="flex items-center gap-4">
+            <div class="text-yellow-400 text-xl">
+              {{ "★".repeat(review.rating) }}{{ "☆".repeat(5 - review.rating) }}
+            </div>
+            <div class="text-gray-600 text-sm">
+              Reviewed by <span class="font-medium">{{ review.User.username }}</span>
+            </div>
+          </div>
+          <p class="mt-2 text-gray-800">{{ review.comment }}</p>
+        </div>
+      </div>
+      <div v-else class="text-gray-600">
+        No reviews yet.
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { useProductStore } from '@/stores/products';
+import { useCartStore } from '@/stores/cart';
+import { useReviewStore } from '@/stores/reviewStore';
+
+export default {
+  name: 'ProductDetails',
+  setup() {
+    const route = useRoute();
+    const productStore = useProductStore();
+    const cartStore = useCartStore();
+    const reviewStore = useReviewStore();
+    
+    const product = ref(null);
+    const quantity = ref(1);
+    const selectedImage = ref(null);
+    const isZoomed = ref(false);
+    const zoomPosition = ref({ x: 0, y: 0 });
+    const mainImage = ref(null);
+
+    const productImages = computed(() => [
+      product.value?.imageUrl,
+      '/api/placeholder/400/400',
+      '/api/placeholder/400/400',
+      '/api/placeholder/400/400'
+    ]);
+
+    const specifications = computed(() => [
+      { label: 'Brand', value: product.value?.brand || 'Generic' },
+      { label: 'Model', value: product.value?.model || 'Standard' },
+      { label: 'Color', value: product.value?.color || 'Various' },
+      { label: 'Weight', value: product.value?.weight || '0.5 kg' },
+    ]);
+
+    const reviews = computed(() => reviewStore.reviews);
+    const totalReviews = computed(() => reviews.value.length);
+
+    const averageRating = computed(() => {
+      if (totalReviews.value === 0) return 0;
+      const sum = reviews.value.reduce((acc, review) => acc + review.rating, 0);
+      return sum / totalReviews.value;
+    });
+
+    const ratingDistribution = computed(() => {
+      const distribution = {};
+      reviews.value.forEach(review => {
+        distribution[review.rating] = (distribution[review.rating] || 0) + 1;
+      });
+      return distribution;
+    });
+
+    const deliveryDate = computed(() => {
+      const date = new Date();
+      date.setDate(date.getDate() + 3);
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric' 
+      });
+    });
+
+    const zoomStyle = computed(() => {
+      if (!isZoomed.value) return {};
+      return {
+        transform: 'scale(2)',
+        transformOrigin: `${zoomPosition.value.x}% ${zoomPosition.value.y}%`
+      };
+    });
+
+    const handleZoom = (event) => {
+      if (!mainImage.value) return;
+      
+      const rect = mainImage.value.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      
+      zoomPosition.value = { x, y };
+      isZoomed.value = true;
+    };
+
+    const addToCart = (product) => {
+      if (!product) return;
+      
+      cartStore.addToCart({
+        ...product,
+        quantity: quantity.value
+      });
+    };
+
+    onMounted(async () => {
+      const productId = route.params.id;
+      product.value = await productStore.fetchProduct(productId);
+      await reviewStore.fetchReviews(productId);
+    });
+
+    return {
+      product,
+      quantity,
+      selectedImage,
+      productImages,
+      specifications,
+      deliveryDate,
+      isZoomed,
+      zoomStyle,
+      mainImage,
+      handleZoom,
+      addToCart,
+      reviews,
+      totalReviews,
+      averageRating,
+      ratingDistribution
+    };
   }
-  
-  .product-image {
-    flex: 1;
-    min-width: 300px;
-    margin-right: 20px;
-  }
-  
-  .product-image img {
-    max-width: 100%;
-    height: auto;
-  }
-  
-  .product-info {
-    flex: 1;
-    min-width: 300px;
-  }
-  
-  .price {
-    font-size: 1.5em;
-    font-weight: bold;
-    color: #4CAF50;
-  }
-  
-  .stock {
-    margin-top: 10px;
-  }
-  
-  .low-stock {
-    color: #f44336;
-  }
-  
-  .add-to-cart {
-    margin-top: 20px;
-  }
-  
-  .add-to-cart input {
-    width: 50px;
-    margin-right: 10px;
-  }
-  
-  .add-to-cart button {
-    padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-  }
-  
-  .add-to-cart button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-  
-  .reviews {
-    width: 100%;
-    margin-top: 40px;
-  }
-  
-  .review {
-    border-bottom: 1px solid #eee;
-    padding: 10px 0;
-  }
-  
-  .rating {
-    color: #FFD700;
-  }
-  </style>
+};
+</script>
+
+<style scoped>
+.product-image img {
+  transition: transform 0.3s ease-out;
+}
+</style>

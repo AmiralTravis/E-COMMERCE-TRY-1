@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-50">
     <div class="container mx-auto px-4 py-8">
       <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">
-        My Orders
+        Orders History
       </h1>
 
       <!-- Loading State -->
@@ -16,13 +16,13 @@
 
       <section v-else>
         <!-- Empty State -->
-        <div v-if="!hasCurrentOrders" class="text-center py-16 bg-white rounded-lg shadow-sm">
+        <div v-if="!hasOrderHistory" class="text-center py-16 bg-white rounded-lg shadow-sm">
           <div class="inline-block p-4 rounded-full bg-gray-100 mb-4">
             <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
           </div>
-          <p class="text-xl text-gray-500 mb-4">No current orders found</p>
+          <p class="text-xl text-gray-500 mb-4">No order history found</p>
           <router-link 
             to="/" 
             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
@@ -31,37 +31,26 @@
           </router-link>
         </div>
 
-        <!-- Current Orders -->
-        <div v-if="hasCurrentOrders" class="space-y-8">
-          <h2 class="text-2xl font-semibold text-gray-800 border-b pb-2">Active Orders</h2>
-          <div class="space-y-6">
+        <!-- Orders List -->
+        <div v-if="hasOrderHistory" class="space-y-6">
+          <div v-for="order in paginatedOrders" :key="order.id">
             <OrderCard 
-              v-for="order in currentOrders" 
-              :key="order.id" 
               :order="order"
+              :is-completed="true"
               @view-details="viewOrderDetails"
             />
           </div>
-        </div>
-
-        <!-- Last Completed Order -->
-        <div v-if="lastCompletedOrder" class="mt-12">
-          <div class="flex justify-between items-center border-b pb-2 mb-6">
-            <h2 class="text-2xl font-semibold text-gray-800">
-              Recently Completed
-            </h2>
-            <router-link 
-              to="/order-history" 
-              class="text-indigo-600 hover:text-indigo-500 font-medium"
+          
+          <!-- Load More Button -->
+          <div v-if="hasMoreOrders" class="text-center mt-8">
+            <button 
+              @click="loadMoreOrders"
+              class="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-500 border border-indigo-600 rounded-md hover:border-indigo-500"
+              :disabled="loadingMore"
             >
-              View All Completed Orders →
-            </router-link>
+              {{ loadingMore ? 'Loading...' : 'Load More Orders' }}
+            </button>
           </div>
-          <OrderCard 
-            :order="lastCompletedOrder"
-            :is-completed="true"
-            @view-details="viewOrderDetails"
-          />
         </div>
       </section>
     </div>
@@ -80,39 +69,59 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useOrderUserStore } from '@/stores/OrderUserStore'
 import OrderCard from './OrderCard.vue'
 
 const orderStore = useOrderUserStore()
 const selectedOrder = ref(null)
+const loadingMore = ref(false)
+const page = ref(1)
+const itemsPerPage = ref(10)
 
-const { 
-  currentOrders, 
-  loading, 
-  hasCurrentOrders,
-} = storeToRefs(orderStore)
+const { loading } = storeToRefs(orderStore)
 
-const lastCompletedOrder = ref(null)
+const orders = ref([])
+const hasMoreOrders = ref(true)
 
-onMounted(async () => {
-  await Promise.all([
-    orderStore.fetchCurrentOrders(),
-    fetchLastCompletedOrder()
-  ])
-})
+const hasOrderHistory = computed(() => orders.value.length > 0)
+const paginatedOrders = computed(() => orders.value)
 
-const fetchLastCompletedOrder = async () => {
-  const response = await orderStore.fetchCompletedOrders(1, 1)
-  if (response?.orders?.length) {
-    lastCompletedOrder.value = response.orders[0]
+const loadMoreOrders = async () => {
+  if (loadingMore.value) return
+  
+  loadingMore.value = true
+  page.value++
+  
+  try {
+    const response = await orderStore.fetchCompletedOrders(page.value)
+    if (response?.orders?.length) {
+      orders.value = [...orders.value, ...response.orders]
+      hasMoreOrders.value = response.orders.length >= itemsPerPage.value
+    } else {
+      hasMoreOrders.value = false
+    }
+  } finally {
+    loadingMore.value = false
   }
 }
 
 const viewOrderDetails = (order) => {
   selectedOrder.value = order
 }
+
+onMounted(async () => {
+  try {
+    const response = await orderStore.fetchCompletedOrders(1)
+    if (response?.orders) {
+      orders.value = response.orders
+      hasMoreOrders.value = response.orders.length >= itemsPerPage.value
+    }
+  } catch (error) {
+    console.error('Failed to fetch initial orders:', error)
+  }
+})
 </script>
 
 <style scoped>

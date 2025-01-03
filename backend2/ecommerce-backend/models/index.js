@@ -1,4 +1,5 @@
-// ecommerce-backend/models/index.js
+// // ecommerce-backend/models/index.js
+
 const fs = require('fs');
 const path = require('path');
 const Sequelize = require('sequelize');
@@ -17,6 +18,7 @@ if (dbConfig.use_env_variable) {
   sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, dbConfig);
 }
 
+// Dynamically import all models in the models directory
 fs
   .readdirSync(__dirname)
   .filter(file => {
@@ -27,6 +29,7 @@ fs
     db[model.name] = model;
   });
 
+// Set up associations here (you can remove associations from the model files)
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
@@ -36,7 +39,9 @@ Object.keys(db).forEach(modelName => {
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
-// Define relationships
+// Define relationships for models here (remove from individual model files)
+
+// Product to Category many-to-many relationship
 db.Product.belongsToMany(db.Category, { 
   through: db.ProductCategory,
   foreignKey: 'productId'
@@ -46,12 +51,15 @@ db.Category.belongsToMany(db.Product, {
   foreignKey: 'categoryId'
 });
 
+// Product to Review one-to-many relationship
 db.Product.hasMany(db.Review, { foreignKey: 'productId' });
 db.Review.belongsTo(db.Product, { foreignKey: 'productId' });
 
+// User to Order one-to-many relationship
 db.User.hasMany(db.Order, { foreignKey: 'userId' });
 db.Order.belongsTo(db.User, { foreignKey: 'userId' });
 
+// User to Cart one-to-many relationship
 db.User.hasMany(db.Cart, {
   foreignKey: 'userId',
 });
@@ -60,6 +68,7 @@ db.Cart.belongsTo(db.User, {
   as: 'user'
 });
 
+// Product to Cart one-to-many relationship
 db.Product.hasMany(db.Cart, {
   foreignKey: 'productId',
   as: 'cartItems'
@@ -69,21 +78,34 @@ db.Cart.belongsTo(db.Product, {
   as: 'product'
 });
 
+// User to Wishlist many-to-many relationship
 db.Product.belongsToMany(db.User, { through: db.Wishlist });
 db.User.belongsToMany(db.Product, { through: db.Wishlist });
 
+// Order to Payment one-to-many relationship
 db.Order.hasMany(db.Payment);
 db.Payment.belongsTo(db.Order);
 
+// User to UserAddress one-to-many relationship
 db.User.hasMany(db.UserAddress, { foreignKey: 'userId' });
 db.UserAddress.belongsTo(db.User, { foreignKey: 'userId' });
 
-
-// Add these with your other associations in index.js
+// Order to OrderItems one-to-many relationship
 db.Order.hasMany(db.OrderItems, { foreignKey: 'orderId' });
 db.OrderItems.belongsTo(db.Order, { foreignKey: 'orderId' });
 
+// Product to OrderItems one-to-many relationship
 db.Product.hasMany(db.OrderItems, { foreignKey: 'productId' });
 db.OrderItems.belongsTo(db.Product, { foreignKey: 'productId' });
+
+// VerifiedPurchase associations (User, Product, and Order)
+db.User.hasMany(db.VerifiedPurchase, { foreignKey: 'userId' });
+db.VerifiedPurchase.belongsTo(db.User, { foreignKey: 'userId' });
+
+db.Product.hasMany(db.VerifiedPurchase, { foreignKey: 'productId' });
+db.VerifiedPurchase.belongsTo(db.Product, { foreignKey: 'productId' });
+
+db.Order.hasMany(db.VerifiedPurchase, { foreignKey: 'orderId' });
+db.VerifiedPurchase.belongsTo(db.Order, { foreignKey: 'orderId' });
 
 module.exports = db;

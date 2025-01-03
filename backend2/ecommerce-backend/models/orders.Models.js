@@ -1,4 +1,6 @@
-// // // // models/ordersModels.js
+// models/ordersModels.js
+
+const moment = require('moment');
 
 module.exports = (sequelize, DataTypes) => {
   const Order = sequelize.define('Order', {
@@ -19,8 +21,16 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     status: {
-      type: DataTypes.STRING(255),
-      allowNull: false
+      type: DataTypes.ENUM(
+        'Pending', 
+        'Processing', 
+        'Shipping', 
+        'Delivering', 
+        'Delivered', 
+        
+      ),
+      allowNull: false,
+      defaultValue: 'Pending'
     },
     paymentVerified: {
       type: DataTypes.BOOLEAN,
@@ -34,29 +44,38 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: true
     },
-    completedAt: {
-      type: DataTypes.DATE,
-      allowNull: true
+    estimatedDate: {
+      type: DataTypes.DATE, // Changed from DATEONLY to full DATE type
+      allowNull: true,
+      get() {
+        // Always return UTC
+        const value = this.getDataValue('estimatedDate');
+        return value ? moment.utc(value).toDate() : null;
+      },
+      set(value) {
+        // Ensure value is converted to UTC before saving
+        this.setDataValue('estimatedDate', 
+          value ? moment(value).utc().toDate() : null
+        );
+      }
     }
   }, {
     timestamps: true,
     tableName: 'Orders'
   });
-  
 
   // Associations
-Order.associate = (models) => {
-  Order.hasOne(models.UserAddress, {
-    foreignKey: 'userId',
-    sourceKey: 'userId'
-  });
-  
-  Order.hasMany(models.OrderItems, {
-    foreignKey: 'orderId',
-    onDelete: 'CASCADE',
-  });
-};
-  
+  Order.associate = (models) => {
+    Order.hasOne(models.UserAddress, {
+      foreignKey: 'userId',
+      sourceKey: 'userId'
+    });
+
+    Order.hasMany(models.OrderItems, {
+      foreignKey: 'orderId',
+      onDelete: 'CASCADE',
+    });
+  };
 
   return Order;
 };

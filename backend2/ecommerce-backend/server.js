@@ -117,6 +117,8 @@ const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const paypalRoutes = require('./routes/paypal'); // PayPal routes import
 const captureOrderRoute = require('./routes/captureOrder'); // Adjust the path as necessary
+const placeholder = require('./routes/placeholder');
+const verifiedPurchaseRoutes = require('./routes/verifiedPurchases');
 const { authenticateToken } = require('./middleware/authMiddleware');
 
 // Apply authentication routes first (unprotected)
@@ -160,6 +162,10 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/paypal', paypalRoutes); // Apply PayPal routes
 app.use('/api', captureOrderRoute); // Use your route under a specific path
+app.use('/api/placeholder', placeholder);
+app.use('/api/verified-purchases', verifiedPurchaseRoutes);
+app.use('/api/reviews', reviewRoutes);
+
 
 // Root route
 app.get('/', (req, res) => {
