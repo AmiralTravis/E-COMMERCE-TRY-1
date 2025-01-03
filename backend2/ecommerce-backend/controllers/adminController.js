@@ -1,12 +1,13 @@
 // controller/adminController.js
 
 const db = require('../config/db');
-const { Product, Order, Category, User } = require('../models');
+const { Product, Order, Category, User, OrderItems, VerifiedPurchase } = require('../models');
 const { Op } = require('sequelize');
 const WebSocket = require('ws');
-const { sendEmail } = require('../utils/emailService');
+const { sendEmail, sendOrderConfirmationEmail, sendDeliveryNotificationEmail } = require('../utils/emailService');
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
+const moment = require('moment');
 
 const wss = new WebSocket.Server({ port: 8080 }); // Adjust port as needed
 
@@ -209,7 +210,7 @@ exports.getSalesReport = async (req, res) => {
         createdAt: {
           [Op.between]: [startDate, endDate]
         },
-        status: 'completed'
+        status: 'Delivered'
       },
       attributes: [
         [db.fn('SUM', db.col('totalAmount')), 'totalSales'],
@@ -557,6 +558,160 @@ exports.getAllAdmins = async (req, res) => {
     console.error('Error fetching admins:', err);
     res.status(500).json({ error: 'Failed to fetch admins' });
   }
+};
+
+
+
+
+// orders logic funcitons--------------------
+
+exports.updateOrderStatus = async (req, res) => {
+  const { id } = req.params;
+  const { 
+    status,
+    estimatedDate
+  } = req.body;
+
+  console.log('Request body received:', req.body);
+
+  const validStatuses = ['Processing', 'Shipping', 'Delivering', 'Delivered', 'Completed'];
+
+  if (!validStatuses.includes(status)) {
+    console.warn(`[WARNING] Invalid status update attempt: ${status} for Order ID: ${id}`);
+    return res.status(400).json({ 
+      errorCode: 'INVALID_STATUS',
+      message: `'${status}' is not a valid order status. Valid statuses are: ${validStatuses.join(', ')}.`, 
+      providedStatus: status 
+    });
+  }
+
+  try {
+    const order = await Order.findByPk(id);
+
+    if (!order) {
+      console.warn(`[WARNING] Order not found for update attempt. Order ID: ${id}`);
+      return res.status(404).json({ 
+        errorCode: 'ORDER_NOT_FOUND',
+        message: `No order found with ID '${id}'. Please check the order ID and try again.`,
+        orderId: id
+      });
+    }
+
+    const statusProgression = ['Processing', 'Shipping', 'Delivering', 'Delivered', 'Completed'];
+    const currentStatusIndex = statusProgression.indexOf(order.status);
+    const newStatusIndex = statusProgression.indexOf(status);
+
+    if (newStatusIndex <= currentStatusIndex) {
+      console.warn(`[WARNING] Invalid status transition. Current: ${order.status}, Attempted: ${status}, Order ID: ${id}`);
+      return res.status(400).json({ 
+        errorCode: 'INVALID_STATUS_TRANSITION',
+        message: `Cannot transition from '${order.status}' to '${status}'. Status transitions must move forward.`,
+        currentStatus: order.status,
+        attemptedStatus: status
+      });
+    }
+
+    let updatedEstimatedDate = null;
+    const previousStatus = order.status;
+    
+    if (status === 'Delivered') {
+      updatedEstimatedDate = moment().utc().toDate();
+      console.info(`[INFO] Automatically setting current date and time for 'Delivered' status.`);
+    } else if (estimatedDate) {
+      try {
+        const parsedDate = moment(estimatedDate);
+        
+        if (parsedDate.isValid()) {
+          updatedEstimatedDate = parsedDate.utc().toDate();
+          
+          console.log('Input local time:', estimatedDate);
+          console.log('Converted to UTC:', updatedEstimatedDate);
+          console.log('UTC ISO String:', updatedEstimatedDate.toISOString());
+        } else {
+          console.warn(`[WARNING] Invalid date format for estimatedDate: ${estimatedDate}`);
+        }
+      } catch (dateError) {
+        console.error('[ERROR] Error parsing estimated date:', dateError);
+      }
+    }
+
+    console.info(`[INFO] Status validation successful. Updating Order ID: ${id} to '${status}'`);
+
+    await order.update({
+      status,
+      estimatedDate: updatedEstimatedDate
+    });
+
+    // Handle Verified Purchases
+    if (status === 'Delivered' && previousStatus === 'Delivering') {
+      console.log('[INFO] Creating verified purchase records...');
+      
+      const orderItems = await OrderItems.findAll({
+        where: { orderId: id },
+        attributes: ['productId'],
+        raw: true
+      });
+
+      if (orderItems.length > 0) {
+        const purchaseRecords = orderItems.map(item => ({
+          userId: order.userId,
+          productId: item.productId,
+          orderId: id
+        }));
+
+        console.log('[INFO] Creating verified purchase records:', JSON.stringify(purchaseRecords, null, 2));
+        
+        await VerifiedPurchase.bulkCreate(purchaseRecords, {
+          ignoreDuplicates: true
+        });
+        
+        console.log('[SUCCESS] Created verified purchase records');
+      } else {
+        console.warn(`[WARNING] No order items found for Order ID: ${id}`);
+      }
+    }
+
+    if (status === 'Delivering') {
+      console.info(`[INFO] Sending delivery notification email for Order ID: ${id}.`);
+      const user = await User.findByPk(order.userId);
+      if (!user) {
+        console.warn(`[WARNING] No user found for Order ID: ${id}. Delivery email not sent.`);
+      } else {
+        await sendDeliveryNotificationEmail(user, order);
+      }
+    }
+
+    console.info(`[INFO] Broadcasting status update for Order ID: ${id}`);
+    broadcastOrderStatusUpdate(id, status, updatedEstimatedDate);
+
+    console.info(`[SUCCESS] Order ID: ${id} status updated to '${status}' successfully.`);
+    res.json({ 
+      message: 'Order status updated successfully', 
+      order 
+    });
+
+  } catch (error) {
+    console.error(`[ERROR] Error updating order status for Order ID: ${id}.`, error);
+    res.status(500).json({ 
+      errorCode: 'SERVER_ERROR',
+      message: 'An unexpected error occurred while updating the order status.',
+      details: error.message
+    });
+  }
+};
+
+// WebSocket broadcast function
+const broadcastOrderStatusUpdate = (orderId, status, estimatedDate) => {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ 
+        type: 'order_status_update', 
+        orderId, 
+        status, 
+        estimatedDate 
+      }));
+    }
+  });
 };
 
 module.exports = exports;

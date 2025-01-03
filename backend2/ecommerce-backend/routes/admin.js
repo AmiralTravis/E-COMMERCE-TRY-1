@@ -38,4 +38,7 @@ router.post('/promote-to-admin', adminController.promoteToAdmin);
 router.post('/remove-admin', authenticateToken, isSuperAdmin, adminController.removeAdmin);
 router.get('/all-admins', authenticateToken, isAdmin, adminController.getAllAdmins);
 
+// In routes/admin.js
+router.put('/orders/:id/update-status', adminController.updateOrderStatus);
+
 module.exports = router;

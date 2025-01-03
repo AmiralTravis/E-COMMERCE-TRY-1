@@ -3,7 +3,7 @@
   <header class="header">
     <nav class="nav">
       <router-link to="/" class="logo">E-Shop</router-link>
-      <!-- <SearchBar /> Add this line -->
+      <SearchBar :categories="categories" />
       <div class="nav-links">
         <router-link to="/products">Products</router-link>
         <router-link to="/cart" class="cart-link">
@@ -80,16 +80,18 @@
 </template>
 
 <script>
-// import SearchBar from './SearchBar.vue';
 import { defineComponent, computed, ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useCartStore } from '../stores/cart';
 import { useRouter } from 'vue-router';
+import SearchBar from './SearchBar.vue';
+import { useCategoryStore } from '../stores/category';
+
 
 export default defineComponent({
   name: 'HeaderFrontend',
   components: {
-    // SearchBar, // Include the SearchBar component
+    SearchBar, // Include the SearchBar component
   },
   setup() {
     const authStore = useAuthStore();
@@ -133,6 +135,9 @@ export default defineComponent({
       notifications.value = notifications.value.map(n => ({ ...n, read: true }));
     };
 
+    const categoryStore = useCategoryStore(); // Create this store
+    const categories = computed(() => categoryStore.categories);
+
     return {
       isAuthenticated,
       isAdmin,
@@ -146,7 +151,8 @@ export default defineComponent({
       notifications,
       unreadNotifications,
       toggleNotifications,
-      markAllAsRead
+      markAllAsRead,
+      categories
     };
   }
 });

@@ -1,153 +1,181 @@
 <template>
   <div class="products-container">
-    <h1>Our Products</h1>
-    
-    <!-- Filters -->
-    <div class="filters">
-      <div class="search-bar">
-        <input 
-          type="text" 
-          v-model="searchQuery" 
-          placeholder="Search products..."
-          @input="debounceSearch"
-        >
-      </div>
-      <div class="category-filter">
-        <select v-model="selectedCategory" @change="filterProducts">
-          <option value="">All Categories</option>
-          <option v-for="category in categories" :key="category.id" :value="category.id">
-            {{ category.name }}
-          </option>
-        </select>
-      </div>
-      <div class="sort-filter">
-        <select v-model="sortBy" @change="filterProducts">
-          <option value="name">Name</option>
-          <option value="price-low">Price: Low to High</option>
-          <option value="price-high">Price: High to Low</option>
-        </select>
-      </div>
-    </div>
-
     <!-- Loading State -->
     <div v-if="loading" class="loading">
       <p>Loading products...</p>
-    </div> 
+    </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="error">
       <p>{{ error }}</p>
-    </div> 
+    </div>
 
-    <!-- Product Grid -->
-    <div v-else class="products-grid">
-      <div v-for="product in filteredProducts" :key="product.id" class="product-card">
+    <!-- Product List -->
+    <div v-else class="products-list">
+      <div v-for="product in products" :key="product.id" class="product-card">
         <img :src="product.imageUrl" :alt="product.name" class="product-image" />
         <div class="product-info">
-          <h2>{{ product.name }}</h2>
+          <a :href="`/products/${product.id}`" target="_blank" class="product-name">
+            {{ product.name }}
+          </a>
+          <!-- Star Rating -->
+          <div class="star-rating">
+            <span v-for="star in 5" :key="star" class="star">
+              {{ star <= Math.round(Number(product.avgRating) || 0) ? '★' : '☆' }}
+            </span>
+            <span class="rating-text">
+              ({{ (Number(product.avgRating) || 0).toFixed(1) }})
+            </span>
+            <span class="review-count">
+              {{ product.reviewCount || 0 }} reviews
+            </span>
+          </div>
           <p class="product-description">{{ product.description }}</p>
           <p class="product-price">${{ product.price.toFixed(2) }}</p>
-          <div class="card-actions">
-            <button @click="addToCart(product)" class="add-to-cart-btn">
-              Add to Cart
-            </button>
-            <router-link :to="`/products/${product.id}`" class="view-details-btn">
-              View Details
-            </router-link>
-          </div>
+          <button @click="addToCart(product)" class="add-to-cart-btn">
+            Add to Cart
+          </button>
         </div>
       </div>
     </div>
 
+    <!-- Pagination -->
+    <div v-if="totalPages > 1" class="pagination">
+      <button 
+        :disabled="currentPage === 1"
+        @click="changePage(currentPage - 1)"
+        class="page-btn"
+      >
+        Previous
+      </button>
+      <button 
+        v-for="page in totalPages" 
+        :key="page"
+        :class="['page-btn', { active: page === currentPage }]"
+        @click="changePage(page)"
+      >
+        {{ page }}
+      </button>
+      <button 
+        :disabled="currentPage === totalPages"
+        @click="changePage(currentPage + 1)"
+        class="page-btn"
+      >
+        Next
+      </button>
+    </div>
+
     <!-- Empty State -->
-    <div v-if="!loading && !error && filteredProducts.length === 0" class="empty-state">
+    <div v-if="!loading && !error && products.length === 0" class="empty-state">
       <p>No products found.</p>
     </div>
   </div>
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, watch } from 'vue';
+import { defineComponent, computed, onMounted, watch } from 'vue';
 import { useProductStore } from '../stores/products';
 import { useCartStore } from '../stores/cart';
-import debounce from 'lodash/debounce';
+import { useRoute, useRouter } from 'vue-router';
 
 export default defineComponent({
   name: 'ProductList',
   setup() {
     const productStore = useProductStore();
     const cartStore = useCartStore();
-    
-    const searchQuery = ref('');
-    const selectedCategory = ref('');
-    const sortBy = ref('name');
+    const route = useRoute();
+    const router = useRouter();
 
-    const categories = [
-      { id: 1, name: 'Electronics' },
-      { id: 2, name: 'Fashion' },
-      { id: 3, name: 'Home & Garden' },
-      { id: 4, name: 'Sports' }
-    ];
+    const products = computed(() => productStore.getProducts);
+    const loading = computed(() => productStore.isLoading);
+    const error = computed(() => productStore.getError);
+    const currentPage = computed(() => productStore.getPagination.page);
+    const totalPages = computed(() => productStore.getPagination.totalPages);
 
-    const filteredProducts = computed(() => {
-      let result = [...productStore.products];
+    // const loadProducts = async () => {
+    //   // Ensure categories is always an array
+    //   const categories = Array.isArray(route.query.categories)
+    //     ? route.query.categories
+    //     : route.query.categories
+    //       ? route.query.categories.split(',').map(Number)
+    //       : [];
 
-      // Apply category filter
-      if (selectedCategory.value) {
-        result = result.filter(product => product.categoryId === selectedCategory.value);
+    //   const searchParams = {
+    //     limit: 15,
+    //     page: currentPage.value,
+    //     query: route.query.search || undefined,
+    //     categories: categories.length ? categories : undefined,
+    //     minPrice: route.query.minPrice || undefined,
+    //     maxPrice: route.query.maxPrice || undefined,
+    //     minRating: route.query.minRating || undefined
+    //   };
+
+    //   await productStore.fetchProducts(searchParams);
+
+    //   // Save search query to recent searches if it exists
+    //   if (route.query.search) {
+    //     productStore.saveRecentSearch(route.query.search);
+    //   }
+    // };
+    const loadProducts = async () => {
+      const searchParams = {
+        limit: 15, // Ensure this is 15
+        page: currentPage.value,
+        query: route.query.search || undefined,
+        categories: route.query.categories?.split(',').map(Number) || [],
+        minPrice: route.query.minPrice || undefined,
+        maxPrice: route.query.maxPrice || undefined,
+        minRating: route.query.minRating || undefined
+      };
+
+      await productStore.fetchProducts(searchParams);
+
+      // Save search query to recent searches if it exists
+      if (route.query.search) {
+        productStore.saveRecentSearch(route.query.search);
       }
+    };
 
-      // Apply sorting
-      result.sort((a, b) => {
-        if (sortBy.value === 'price-low') return a.price - b.price;
-        if (sortBy.value === 'price-high') return b.price - a.price;
-        return a.name.localeCompare(b.name);
+    const changePage = (page) => {
+      router.push({
+        query: {
+          ...route.query,
+          page
+        }
       });
-
-      return result;
-    });
+      productStore.setPage(page);
+    };
 
     const addToCart = (product) => {
       cartStore.addToCart(product);
     };
 
-    const fetchProducts = async () => {
-      await productStore.fetchProducts(searchQuery.value);
-    };
-
-    const debounceSearch = debounce(() => {
-      fetchProducts();
-    }, 300);
-
-    const filterProducts = () => {
-      fetchProducts();
-    };
-
+    // Load products on mount
     onMounted(() => {
-      fetchProducts();
+      productStore.loadRecentSearches(); // Load recent searches from localStorage
+      loadProducts();
+      console.log('Products:', products.value); // Debugging
     });
 
-    watch(searchQuery, (newValue) => {
-      if (newValue === '') {
-        fetchProducts();
-      }
-    });
+    // Watch for route query changes
+    watch(() => route.query, (newQuery) => {
+      console.log('Route query changed:', newQuery); // Debugging
+      loadProducts();
+    }, { deep: true });
 
     return {
-      searchQuery,
-      selectedCategory,
-      sortBy,
-      categories,
-      filteredProducts,
-      loading: computed(() => productStore.loading),
-      error: computed(() => productStore.error),
-      addToCart,
-      debounceSearch,
-      filterProducts
+      products,
+      loading,
+      error,
+      currentPage,
+      totalPages,
+      changePage,
+      addToCart
     };
   }
 });
 </script>
+
 
 <style scoped>
 .products-container {
@@ -156,62 +184,63 @@ export default defineComponent({
   padding: 20px;
 }
 
-.filters {
+.products-list {
   display: flex;
+  flex-direction: column;
   gap: 20px;
-  margin-bottom: 20px;
-}
-
-.search-bar input,
-.category-filter select,
-.sort-filter select {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  width: 200px;
-}
-
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
 }
 
 .product-card {
+  display: flex;
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
-  transition: transform 0.3s;
-  background-color: white;
-}
-
-.product-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  background: white;
 }
 
 .product-image {
-  width: 100%;
+  width: 200px;
   height: 200px;
   object-fit: cover;
 }
 
 .product-info {
-  padding: 15px;
+  padding: 20px;
+  flex: 1;
 }
 
-.product-info h2 {
+.product-name {
   font-size: 1.2rem;
-  margin: 0 0 10px 0;
   color: #333;
+  text-decoration: none;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.product-name:hover {
+  color: #3498db;
+}
+
+.star-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0;
+}
+
+.star {
+  color: #f1c40f;
+  font-size: 1.2rem;
+}
+
+.rating-text {
+  color: #666;
+  font-size: 0.9rem;
 }
 
 .product-description {
   color: #666;
   margin: 10px 0;
-  font-size: 0.9rem;
-  line-height: 1.4;
 }
 
 .product-price {
@@ -221,66 +250,54 @@ export default defineComponent({
   margin: 10px 0;
 }
 
-.card-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.add-to-cart-btn,
-.view-details-btn {
-  flex: 1;
-  padding: 10px;
-  border-radius: 4px;
-  text-align: center;
-  text-decoration: none;
-  font-weight: 500;
-  transition: background-color 0.3s;
-}
-
 .add-to-cart-btn {
   background-color: #3498db;
   color: white;
   border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
   cursor: pointer;
 }
 
-.add-to-cart-btn:hover {
-  background-color: #2980b9;
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
 }
 
-.view-details-btn {
-  background-color: #34495e;
+.page-btn {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.page-btn.active {
+  background: #3498db;
   color: white;
+  border-color: #3498db;
 }
 
-.view-details-btn:hover {
-  background-color: #2c3e50;
-}
-
-.loading,
-.error,
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  margin: 20px 0;
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {
-  .filters {
+  .product-card {
     flex-direction: column;
   }
-  
-  .search-bar input,
-  .category-filter select,
-  .sort-filter select {
+
+  .product-image {
     width: 100%;
   }
+}
 
-  .products-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
+.review-count {
+  margin-left: 8px;
+  color: #666;
+  font-size: 0.9rem;
 }
 </style>

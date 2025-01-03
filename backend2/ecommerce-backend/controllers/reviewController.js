@@ -1,11 +1,13 @@
-const { Review } = require('../models'); // Adjust the import to your actual model file path
+// controllers/reviewController.js
+const { Review, User, Product, VerifiedPurchases } = require('../models');
+const { Op } = require('sequelize');
 
-// Get all reviews for a product
 exports.getReviewsByProduct = async (req, res) => {
   const { productId } = req.params;
   try {
     const reviews = await Review.findAll({
       where: { productId: productId },
+      include: [{ model: User, attributes: ['username'] }]
     });
     res.json(reviews);
   } catch (err) {
@@ -14,7 +16,6 @@ exports.getReviewsByProduct = async (req, res) => {
   }
 };
 
-// Add a review to a product
 exports.addReview = async (req, res) => {
   const { productId } = req.params;
   const { userId, rating, comment } = req.body;
@@ -26,6 +27,8 @@ exports.addReview = async (req, res) => {
       rating,
       comment,
     });
+    
+    await Product.updateAverageRating(productId);
     res.status(201).json(newReview);
   } catch (err) {
     console.error(err);
@@ -33,7 +36,6 @@ exports.addReview = async (req, res) => {
   }
 };
 
-// Update a review
 exports.updateReview = async (req, res) => {
   const { id } = req.params;
   const { rating, comment } = req.body;
@@ -47,7 +49,8 @@ exports.updateReview = async (req, res) => {
     review.rating = rating;
     review.comment = comment;
     await review.save();
-
+    
+    await Product.updateAverageRating(review.productId);
     res.json(review);
   } catch (err) {
     console.error(err);
@@ -55,20 +58,62 @@ exports.updateReview = async (req, res) => {
   }
 };
 
-// Delete a review
 exports.deleteReview = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await Review.destroy({
-      where: { id: id },
-    });
-    if (result === 0) {
+    const review = await Review.findByPk(id);
+    if (!review) {
       return res.status(404).json({ error: 'Review not found' });
     }
+    
+    const productId = review.productId;
+    await review.destroy();
+    await Product.updateAverageRating(productId);
+    
     res.status(204).send();
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to delete review' });
+  }
+};
+
+exports.checkReviewEligibility = async (req, res) => {
+  const { productId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const verifiedPurchase = await VerifiedPurchases.findOne({
+      where: { 
+        userId,
+        productId,
+        delivered: true
+      }
+    });
+    
+    res.json({ canReview: !!verifiedPurchase });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to check eligibility' });
+  }
+};
+
+exports.getUserReview = async (req, res) => {
+  const { productId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const review = await Review.findOne({
+      where: { productId, userId },
+      include: [{ model: User, attributes: ['username'] }]
+    });
+    
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    res.json(review);
+  } catch (error) {
+    console.error('Error fetching user review:', error);
+    res.status(500).json({ error: 'Failed to fetch user review' });
   }
 };

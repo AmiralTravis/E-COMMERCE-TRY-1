@@ -6,6 +6,8 @@ import App from './App.vue';
 import router from './router';
 import api from './services/api';
 import { useAuthStore } from './stores/auth';
+import './assets/main.css'; // Import Tailwind styles
+
 
 const app = createApp(App);
 const pinia = createPinia();

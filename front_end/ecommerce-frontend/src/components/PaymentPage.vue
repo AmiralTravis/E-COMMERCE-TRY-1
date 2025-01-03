@@ -96,9 +96,39 @@ export default defineComponent({
       }
     };
 
+    // Create the order in the backend before PayPal starts
+    const handleSubmit = async () => {
+      try {
+        if (cartStore.items.length === 0) {
+          throw new Error('Cannot submit order with an empty cart');
+        }
+
+        const response = await api.post('/orders', {
+          items: cartStore.items.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          totalAmount: cartStore.totalPrice,
+          shippingDetails: shippingDetails.value
+        });
+
+        return response.data.id; // Return the order ID
+      } catch (error) {
+        console.error('Error creating order:', error);
+        return null;
+      }
+    };
+
     const loadPayPalButton = () => {
       window.paypal.Buttons({
         createOrder: async (data, actions) => {
+          const orderId = await handleSubmit(); // Create order in backend
+          if (!orderId) {
+            alert('Failed to create order. Please try again.');
+            return;
+          }
+          // Pass the order ID to PayPal for payment processing
           return actions.order.create({
             purchase_units: [{
               amount: { value: total.value.toFixed(2) }
