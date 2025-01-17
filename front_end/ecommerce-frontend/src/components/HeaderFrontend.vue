@@ -1,8 +1,11 @@
-<!-- components/HeaderFrontend.vue-->
+<!-- components/HeaderFrontend.vue -->
 <template>
   <header class="header">
     <nav class="nav">
-      <router-link to="/" class="logo">E-Shop</router-link>
+      <!-- Logo Section -->
+      <router-link to="/" class="logo">
+        <img src="@/assets/logo.png" alt="Logo" class="logo-image" />
+      </router-link>
       <SearchBar :categories="categories" />
       <div class="nav-links">
         <router-link to="/products">Products</router-link>
@@ -87,11 +90,10 @@ import { useRouter } from 'vue-router';
 import SearchBar from './SearchBar.vue';
 import { useCategoryStore } from '../stores/category';
 
-
 export default defineComponent({
   name: 'HeaderFrontend',
   components: {
-    SearchBar, // Include the SearchBar component
+    SearchBar,
   },
   setup() {
     const authStore = useAuthStore();
@@ -101,7 +103,6 @@ export default defineComponent({
     const showDropdown = ref(false);
     const showNotifications = ref(false);
     
-    // Mock notifications data - replace with your actual notifications system
     const notifications = ref([
       { id: 1, message: 'Your order has been shipped!', time: '2 hours ago', read: false },
       { id: 2, message: 'New products available', time: '1 day ago', read: true }
@@ -135,7 +136,7 @@ export default defineComponent({
       notifications.value = notifications.value.map(n => ({ ...n, read: true }));
     };
 
-    const categoryStore = useCategoryStore(); // Create this store
+    const categoryStore = useCategoryStore();
     const categories = computed(() => categoryStore.categories);
 
     return {
@@ -159,26 +160,30 @@ export default defineComponent({
 </script>
 
 <style scoped>
-
 .header {
-  background-color: #ffffff;
+  background-color: #04221F;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  padding: 1rem;
+  padding: 10px;
 }
 
 .nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
+  max-width: 1350px;
   margin: 0 auto;
 }
 
 .logo {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #333;
+  color: #b8be5e;
   text-decoration: none;
+}
+
+.logo-image {
+  height: 60px; /* Adjust the height as needed */
+  width: auto; /* Maintain aspect ratio */
 }
 
 .nav-links {
@@ -188,7 +193,7 @@ export default defineComponent({
 }
 
 .nav-links a {
-  color: #333;
+  color: #ebebeb;
   text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
@@ -196,7 +201,7 @@ export default defineComponent({
 }
 
 .nav-links a:hover {
-  background-color: #f5f5f5;
+  background-color: #214e0f;
 }
 
 .cart-link {
@@ -224,7 +229,6 @@ export default defineComponent({
   color: white !important;
 }
 
-/* New styles for user navigation */
 .user-nav-container {
   position: relative;
   cursor: pointer;
@@ -236,14 +240,14 @@ export default defineComponent({
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  background-color: #ffffff;
+  background-color: rgb(17, 45, 4);
 }
 
 .avatar {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: #3498db;
+  background-color: #a18338;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -256,7 +260,7 @@ export default defineComponent({
 }
 
 .username {
-  color: #333;
+  color: #cea532;
   font-size: 14px;
 }
 
@@ -272,7 +276,6 @@ export default defineComponent({
   }
 }
 
-/* New styles for dropdown menu */
 .user-nav {
   position: relative;
   cursor: pointer;
@@ -280,14 +283,13 @@ export default defineComponent({
 
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 0px); /* Position it right below with minimal gap */
-  left: 0; /* Align with the left edge of user-nav */
+  top: calc(100% + 0px);
+  left: 0;
   background-color: hsl(0, 0%, 100%);
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   width: 200px;
   z-index: 1000;
-  /* Remove margin-top since we're using calc() for positioning */
 }
 
 .dropdown-item {
@@ -318,7 +320,6 @@ export default defineComponent({
   font-size: 1rem;
 }
 
-/* Notifications styles */
 .notifications {
   position: relative;
   cursor: pointer;

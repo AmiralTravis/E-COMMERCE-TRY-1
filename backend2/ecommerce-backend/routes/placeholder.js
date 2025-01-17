@@ -1,31 +1,29 @@
-// /routes/placeholder.js
+// /routes/placeholder.js 
 const express = require('express');
 const router = express.Router();
 const sharp = require('sharp');
 const axios = require('axios');
-const cache = require('memory-cache'); // Add this package to your dependencies
+const cache = require('memory-cache');
 
-// Cache duration in milliseconds (e.g., 1 hour)
-const CACHE_DURATION = 60 * 60 * 1000;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 router.get('/:width/:height', async (req, res) => {
   const { width, height } = req.params;
-  const imageUrl = req.query.url; // Get image URL from query parameter
-  
+  const imageUrl = req.query.url;
+
+  // Generate a placeholder if no URL is provided
   if (!imageUrl) {
-    // Generate a placeholder if no URL is provided
     try {
-      console.log("Enteronn placeholder func")
       const placeholder = await sharp({
         create: {
           width: parseInt(width),
           height: parseInt(height),
           channels: 4,
-          background: { r: 240, g: 240, b: 240, alpha: 1 }
-        }
+          background: { r: 240, g: 240, b: 240, alpha: 1 },
+        },
       })
-      .jpeg({ quality: 80 })
-      .toBuffer();
+        .jpeg({ quality: 80 })
+        .toBuffer();
 
       res.set('Content-Type', 'image/jpeg');
       res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
@@ -36,7 +34,7 @@ router.get('/:width/:height', async (req, res) => {
     }
   }
 
-  // Create a cache key from the URL and dimensions
+  // Cache key for the image
   const cacheKey = `${imageUrl}-${width}-${height}`;
   const cachedImage = cache.get(cacheKey);
 
@@ -47,33 +45,48 @@ router.get('/:width/:height', async (req, res) => {
   }
 
   try {
-    const response = await axios.get(imageUrl, { 
+    // Fetch the image from the URL
+    const response = await axios.get(imageUrl, {
       responseType: 'arraybuffer',
-      timeout: 5000 // 5 second timeout
+      timeout: 5000, // 5-second timeout
     });
 
+    // Resize and optimize the image
     const resizedImage = await sharp(response.data)
       .resize(parseInt(width), parseInt(height), {
         fit: 'cover',
-        withoutEnlargement: true
+        withoutEnlargement: true,
       })
-      .jpeg({ 
+      .jpeg({
         quality: 80,
-        progressive: true
+        progressive: true,
       })
       .toBuffer();
 
     // Cache the resized image
     cache.put(cacheKey, resizedImage, CACHE_DURATION);
 
-    // Set appropriate headers
+    // Set headers and send the image
     res.set('Content-Type', 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=31536000');
     res.send(resizedImage);
-
   } catch (error) {
     console.error('Error processing image:', error);
-    res.status(500).send('Error processing image');
+    // Fallback to placeholder if the image URL fails
+    const placeholder = await sharp({
+      create: {
+        width: parseInt(width),
+        height: parseInt(height),
+        channels: 4,
+        background: { r: 240, g: 240, b: 240, alpha: 1 },
+      },
+    })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=31536000');
+    res.send(placeholder);
   }
 });
 

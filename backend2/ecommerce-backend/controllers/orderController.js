@@ -229,14 +229,13 @@ exports.processPayPalOrder = async (req, res) => {
 
 
 
-
 exports.getCurrentUserOrders = async (req, res) => {
   try {
     const currentOrders = await Order.findAll({
       where: {
         userId: req.user.id,
         status: {
-          [Op.notIn]: ['Delivered', 'Cancelled']
+          [Op.notIn]: ['Delivered', 'Cancelled', 'Pending'] // Exclude "Pending" status
         }
       },
       include: [
@@ -250,7 +249,7 @@ exports.getCurrentUserOrders = async (req, res) => {
           ]
         }
       ],
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']] // Sort by latest orders
     });
 
     res.json({

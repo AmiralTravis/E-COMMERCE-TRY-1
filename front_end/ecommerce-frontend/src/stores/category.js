@@ -1,29 +1,4 @@
-// import { defineStore } from 'pinia';
-// import api from '../services/api';
-
-// export const useCategoryStore = defineStore('categories', {
-//   state: () => ({
-//     categories: [], // This was initialized correctly but might be getting non-array data
-//     mainCategories: []
-//   }),
-  
-//   actions: {
-//     async fetchCategories() {
-//       try {
-//         const response = await api.get('/categories');
-//         // Ensure we're setting an array
-//         this.categories = Array.isArray(response.data) ? response.data : [];
-//         this.mainCategories = this.categories.filter(c => c.isMainCategory);
-//       } catch (error) {
-//         console.error('Failed to fetch categories:', error);
-//         this.categories = [];
-//         this.mainCategories = [];
-//       }
-//     }
-//   }
-// });
-
-// // stores/category.js
+// /stores/category.js
 
 import { defineStore } from 'pinia';
 import api from '../services/api';

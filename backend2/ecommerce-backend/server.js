@@ -131,7 +131,8 @@ const publicPathsRegex = [
   /^\/auth\/refresh$/,
   /^\/products$/,
   /^\/categories$/,
-  /^\/products\/[^\/]+\/reviews$/, // Add this line for product reviews
+  /^\/products\/[^\/]+\/reviews$/, // Existing pattern
+  /^\/api\/reviews\/[^\/]+$/, // Add this line for GET /api/reviews/:productId
 ];
 
 // Authentication middleware for protected routes

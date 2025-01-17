@@ -1,4 +1,4 @@
-// models/Review.js
+// models/reviewsModels.js
 module.exports = (sequelize, DataTypes) => {
   const Review = sequelize.define('Review', {
     productId: {  // Changed to snake_case
