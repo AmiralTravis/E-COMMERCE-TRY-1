@@ -59,10 +59,17 @@ html, body {
   color: #2c3e50;
 }
 
-.main-content {
+/* .main-content {
   flex: 1;
   padding: 20px;
   max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+} */
+.main-content {
+  flex: 1;
+  padding: 5px; 
+  max-width: 1600px;
   margin: 0 auto;
   width: 100%;
 }

@@ -1,28 +1,53 @@
 <!-- components/AdminOrderManagement.vue -->
-
 <template>
   <div class="admin-order-management">
     <h1>Order Management</h1>
 
     <div class="filters">
+      <!-- Checkbox to filter out Pending orders -->
+      <label>
+        <input 
+          type="checkbox" 
+          v-model="hidePendingOrders" 
+        />
+        Hide Pending Orders
+      </label>
+
+      <!-- Checkbox to filter out Delivered orders -->
+      <label>
+        <input 
+          type="checkbox" 
+          v-model="hideDeliveredOrders" 
+        />
+        Hide Delivered Orders
+      </label>
+
+      <!-- Status filter dropdown -->
       <select v-model="statusFilter">
         <option value="">All Statuses</option>
         <option v-for="status in orderStatuses" :key="status">
           {{ status }}
         </option>
       </select>
+
+      <!-- Search input -->
       <input 
         v-model="searchQuery" 
         placeholder="Search by Order ID or Username"
       />
     </div>
 
+    <!-- Loading state -->
     <div v-if="orderManagementStore.loading" class="loading">
       Loading orders...
     </div>
+
+    <!-- Error state -->
     <div v-else-if="orderManagementStore.error" class="error">
       {{ orderManagementStore.error }}
     </div>
+
+    <!-- Orders table -->
     <table v-else-if="orderManagementStore.orders?.length" class="orders-table">
       <thead>
         <tr>
@@ -76,10 +101,12 @@
       </tbody>
     </table>
 
+    <!-- No orders available -->
     <div v-else>
       <p>No orders available to display.</p>
     </div>
 
+    <!-- Order detail modal -->
     <OrderDetailModal 
       v-if="selectedOrder"
       :order="selectedOrder"
@@ -99,6 +126,8 @@ const statusFilter = ref('');
 const searchQuery = ref('');
 const shippingDates = ref({});
 const deliveryDates = ref({});
+const hidePendingOrders = ref(true); // Checkbox to hide Pending orders (checked by default)
+const hideDeliveredOrders = ref(true); // Checkbox to hide Delivered orders (checked by default)
 
 const orderStatuses = [
   'Pending', 
@@ -109,6 +138,7 @@ const orderStatuses = [
   'Cancelled'
 ];
 
+// Computed property to filter orders
 const filteredOrders = computed(() => {
   const orders = orderManagementStore.orders || []; // Default to empty array
   return orders.filter(order => {
@@ -119,10 +149,17 @@ const filteredOrders = computed(() => {
       order.id.toString().includes(searchQuery.value) ||
       order.User?.username?.toLowerCase().includes(searchQuery.value.toLowerCase());
 
-    return matchStatus && matchSearch;
+    // Exclude Pending orders if checkbox is checked
+    const excludePending = hidePendingOrders.value ? order.status !== 'Pending' : true;
+
+    // Exclude Delivered orders if checkbox is checked
+    const excludeDelivered = hideDeliveredOrders.value ? order.status !== 'Delivered' : true;
+
+    return matchStatus && matchSearch && excludePending && excludeDelivered;
   });
 });
 
+// Function to get status class for styling
 function getStatusClass(status) {
   const statusClasses = {
     'Pending': 'status-pending',
@@ -135,6 +172,7 @@ function getStatusClass(status) {
   return statusClasses[status] || '';
 }
 
+// Function to update order status to Shipping
 const updateToShipping = async (order) => {
   const shippingDate = shippingDates.value[order.id];
   if (!shippingDate) {
@@ -149,6 +187,7 @@ const updateToShipping = async (order) => {
   }
 };
 
+// Function to update order status to Delivering
 const updateToDelivering = async (order) => {
   const deliveryDateTime = deliveryDates.value[order.id];
   if (!deliveryDateTime) {
@@ -163,6 +202,7 @@ const updateToDelivering = async (order) => {
   }
 };
 
+// Function to update order status to Delivered
 const updateToDelivered = async (order) => {
   try {
     await orderManagementStore.updateOrderStatus(order.id, 'Delivered');
@@ -172,18 +212,19 @@ const updateToDelivered = async (order) => {
   }
 };
 
+// Fetch orders and initialize WebSocket on component mount
 onMounted(() => {
   orderManagementStore.fetchOrders();
   orderManagementStore.initializeWebSocket();
 });
 
+// Close WebSocket on component unmount
 onUnmounted(() => {
   if (orderManagementStore.socket) {
     orderManagementStore.socket.close();
   }
 });
 </script>
-
 
 <style scoped>
 .admin-order-management {
@@ -194,6 +235,7 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  align-items: center;
 }
 
 .orders-table {

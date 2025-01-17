@@ -6,6 +6,7 @@ const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET;
 
 // Define public paths that don't require authentication
+
 const publicPaths = [
   '/auth/login',
   '/auth/register',
@@ -13,7 +14,8 @@ const publicPaths = [
   '/products',
   '/categories',
   '/products/:id',
-  '/products/:productId/reviews'
+  '/products/:productId/reviews',
+  '/reviews/:productId' // Add this line
 ];
 
 const authenticateToken = (req, res, next) => {
@@ -23,7 +25,12 @@ const authenticateToken = (req, res, next) => {
   console.log('Headers:', req.headers);
 
   // Skip authentication for public paths and OPTIONS requests
-  if (publicPaths.some(path => req.path.match(new RegExp(`^${path.replace(':id', '[^/]+')}$`))) || req.method === 'OPTIONS') {
+  const isPublicPath = publicPaths.some(path => {
+    const regex = new RegExp(`^${path.replace(/:\w+/g, '[^/]+')}$`);
+    return regex.test(req.path);
+  });
+
+  if (isPublicPath || req.method === 'OPTIONS') {
     console.log('Public path, skipping authentication.');
     return next();
   }

@@ -36,10 +36,17 @@
         <div>
           <h1 class="text-3xl font-bold text-gray-900">{{ product.name }}</h1>
           <div class="mt-2 flex items-center gap-2">
+            <!-- Partial Star Rating -->
             <div class="flex items-center">
-              <div class="text-yellow-400">
-                {{ "★".repeat(Math.floor(averageRating)) }}
-                {{ "☆".repeat(5 - Math.floor(averageRating)) }}
+              <div class="text-yellow-400 text-xl">
+                <span v-for="star in 5" :key="star">
+                  <span v-if="star <= Math.floor(averageRating)" class="full-star">★</span>
+                  <span v-else-if="star === Math.ceil(averageRating) && averageRating % 1 !== 0" class="partial-star">
+                    <span class="half-filled">★</span>
+                    <span class="half-empty">☆</span>
+                  </span>
+                  <span v-else class="empty-star">☆</span>
+                </span>
               </div>
               <span class="ml-2 text-sm text-gray-600">({{ averageRating.toFixed(1) }} average)</span>
             </div>
@@ -109,35 +116,173 @@
           <div class="flex items-baseline gap-4">
             <span class="text-5xl font-bold">{{ averageRating.toFixed(1) }}</span>
             <div class="text-yellow-400 text-xl">
-              {{ "★".repeat(Math.floor(averageRating)) }}{{ "☆".repeat(5 - Math.floor(averageRating)) }}
+              <span v-for="star in 5" :key="star">
+                <span v-if="star <= Math.floor(averageRating)" class="full-star">★</span>
+                <span v-else-if="star === Math.ceil(averageRating) && averageRating % 1 !== 0" class="partial-star">
+                  <span class="half-filled">★</span>
+                  <span class="half-empty">☆</span>
+                </span>
+                <span v-else class="empty-star">☆</span>
+              </span>
             </div>
           </div>
           <p class="text-sm text-gray-600">Based on {{ totalReviews }} reviews</p>
         </div>
         
+        <!-- Rating Distribution Bars (Clickable) -->
         <div class="col-span-2">
           <div v-for="n in 5" :key="n" class="flex items-center gap-4 mb-2">
-            <span class="text-sm w-8">{{ 6-n }}★</span>
-            <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <span 
+              class="text-sm w-8 cursor-pointer"
+              :class="{ 'font-bold text-blue-600': selectedRatings.includes(6 - n) }"
+              @click="toggleRatingFilter(6 - n)"
+            >
+              {{ 6 - n }}★
+            </span>
+            <div 
+              class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden cursor-pointer"
+              @click="toggleRatingFilter(6 - n)"
+            >
               <div 
                 class="h-full bg-yellow-400 rounded-full"
-                :style="`width: ${(ratingDistribution[6-n] / totalReviews * 100) || 0}%`"
+                :style="`width: ${(ratingDistribution[6 - n] / totalReviews * 100) || 0}%`"
               ></div>
             </div>
-            <span class="text-sm w-16">{{ ratingDistribution[6-n] || 0 }}</span>
+            <span 
+              class="text-sm w-16 cursor-pointer"
+              :class="{ 'font-bold text-blue-600': selectedRatings.includes(6 - n) }"
+              @click="toggleRatingFilter(6 - n)"
+            >
+              {{ ratingDistribution[6 - n] || 0 }}
+            </span>
           </div>
         </div>
       </div>
 
+      <!-- Add Review Form -->
+      <div v-if="reviewStore.canReview && !reviewStore.userReview" class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">Write a Review</h3>
+        <form @submit.prevent="submitReview">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Rating</label>
+            <div class="flex items-center mt-1">
+              <span
+                v-for="star in 5"
+                :key="star"
+                class="text-2xl cursor-pointer"
+                :class="{
+                  'text-yellow-400': star <= newReview.rating,
+                  'text-gray-300': star > newReview.rating
+                }"
+                @click="setRating(star)"
+              >
+                ★
+              </span>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Comment</label>
+            <textarea
+              v-model="newReview.comment"
+              class="mt-1 block w-full p-2 border rounded-lg"
+              rows="4"
+              placeholder="Share your thoughts about the product..."
+            ></textarea>
+          </div>
+          <button
+            type="submit"
+            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Submit Review
+          </button>
+        </form>
+      </div>
+
+      <!-- Edit Review Form -->
+      <div v-if="isEditing" class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">Edit Your Review</h3>
+        <form @submit.prevent="updateReview">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Rating</label>
+            <div class="flex items-center mt-1">
+              <span
+                v-for="star in 5"
+                :key="star"
+                class="text-2xl cursor-pointer"
+                :class="{
+                  'text-yellow-400': star <= editingReview.rating,
+                  'text-gray-300': star > editingReview.rating
+                }"
+                @click="setRating(star)"
+              >
+                ★
+              </span>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Comment</label>
+            <textarea
+              v-model="editingReview.comment"
+              class="mt-1 block w-full p-2 border rounded-lg"
+              rows="4"
+              placeholder="Update your review..."
+            ></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="submit"
+              class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Update Review
+            </button>
+            <button
+              type="button"
+              @click="cancelEdit"
+              class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+
       <!-- Review List -->
-      <div v-if="reviews.length > 0" class="space-y-6">
-        <div v-for="review in reviews" :key="review.id" class="border-b pb-6">
+      <div v-if="filteredReviews.length > 0" class="space-y-6">
+        <!-- User's Review (Always at the top, hidden when editing) -->
+        <div v-if="reviewStore.userReview && !isEditing" class="border-b pb-6">
+          <div class="flex items-center gap-4">
+            <div class="text-yellow-400 text-xl">
+              {{ "★".repeat(reviewStore.userReview.rating) }}{{ "☆".repeat(5 - reviewStore.userReview.rating) }}
+            </div>
+            <div class="text-gray-600 text-sm">
+              Reviewed by <span class="font-medium">{{ reviewStore.userReview.User?.username || 'You' }}</span>
+            </div>
+            <div class="ml-auto flex gap-2">
+              <button
+                @click="editReview(reviewStore.userReview)"
+                class="text-sm text-blue-600 hover:text-blue-700"
+              >
+                ✏️ Edit
+              </button>
+              <button
+                @click="confirmDeleteReview(reviewStore.userReview.id)"
+                class="text-sm text-red-600 hover:text-red-700"
+              >
+                🗑️ Delete
+              </button>
+            </div>
+          </div>
+          <p class="mt-2 text-gray-800">{{ reviewStore.userReview.comment }}</p>
+        </div>
+
+        <!-- Other Reviews -->
+        <div v-for="review in filteredReviews.filter(r => r.id !== reviewStore.userReview?.id)" :key="review.id" class="border-b pb-6">
           <div class="flex items-center gap-4">
             <div class="text-yellow-400 text-xl">
               {{ "★".repeat(review.rating) }}{{ "☆".repeat(5 - review.rating) }}
             </div>
             <div class="text-gray-600 text-sm">
-              Reviewed by <span class="font-medium">{{ review.User.username }}</span>
+              Reviewed by <span class="font-medium">{{ review.User?.username || 'Anonymous' }}</span>
             </div>
           </div>
           <p class="mt-2 text-gray-800">{{ review.comment }}</p>
@@ -241,10 +386,90 @@ export default {
       });
     };
 
+    // Review Management
+    const newReview = ref({ rating: 5, comment: '' });
+    const isEditing = ref(false);
+    const editingReview = ref({ id: null, rating: 5, comment: '' });
+
+    const setRating = (star) => {
+      if (isEditing.value) {
+        editingReview.value.rating = star;
+      } else {
+        newReview.value.rating = star;
+      }
+    };
+
+    const submitReview = async () => {
+      try {
+        await reviewStore.addReview(route.params.id, newReview.value);
+        newReview.value = { rating: 5, comment: '' };
+        await reviewStore.fetchReviews(route.params.id);
+        await reviewStore.getUserReview(route.params.id);
+      } catch (error) {
+        console.error('Failed to submit review:', error);
+      }
+    };
+
+    const editReview = (review) => {
+      isEditing.value = true;
+      editingReview.value = { ...review };
+    };
+
+    const updateReview = async () => {
+      try {
+        await reviewStore.updateReview(editingReview.value.id, editingReview.value);
+        isEditing.value = false;
+        await reviewStore.fetchReviews(route.params.id);
+        await reviewStore.getUserReview(route.params.id);
+      } catch (error) {
+        console.error('Failed to update review:', error);
+      }
+    };
+
+    const confirmDeleteReview = (reviewId) => {
+      if (confirm('Are you sure you want to delete this review?')) {
+        deleteReview(reviewId);
+      }
+    };
+
+    const deleteReview = async (reviewId) => {
+      try {
+        await reviewStore.deleteReview(reviewId);
+        isEditing.value = false;
+        await reviewStore.fetchReviews(route.params.id);
+        await reviewStore.getUserReview(route.params.id);
+      } catch (error) {
+        console.error('Failed to delete review:', error);
+      }
+    };
+
+    const cancelEdit = () => {
+      isEditing.value = false;
+      editingReview.value = { id: null, rating: 5, comment: '' };
+    };
+
+    // Rating Filter Logic
+    const selectedRatings = ref([]);
+
+    const toggleRatingFilter = (rating) => {
+      if (selectedRatings.value.includes(rating)) {
+        selectedRatings.value = selectedRatings.value.filter(r => r !== rating);
+      } else {
+        selectedRatings.value.push(rating);
+      }
+    };
+
+    const filteredReviews = computed(() => {
+      if (selectedRatings.value.length === 0) return reviews.value;
+      return reviews.value.filter(review => selectedRatings.value.includes(review.rating));
+    });
+
     onMounted(async () => {
       const productId = route.params.id;
       product.value = await productStore.fetchProduct(productId);
       await reviewStore.fetchReviews(productId);
+      await reviewStore.checkReviewEligibility(productId);
+      await reviewStore.getUserReview(productId);
     });
 
     return {
@@ -262,14 +487,53 @@ export default {
       reviews,
       totalReviews,
       averageRating,
-      ratingDistribution
+      ratingDistribution,
+      reviewStore,
+      newReview,
+      isEditing,
+      editingReview,
+      setRating,
+      submitReview,
+      editReview,
+      updateReview,
+      confirmDeleteReview,
+      deleteReview,
+      cancelEdit,
+      selectedRatings,
+      toggleRatingFilter,
+      filteredReviews,
     };
   }
 };
 </script>
 
 <style scoped>
-.product-image img {
-  transition: transform 0.3s ease-out;
+textarea {
+  resize: none;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Partial Star Styles */
+.partial-star {
+  position: relative;
+  display: inline-block;
+}
+.half-filled {
+  position: absolute;
+  width: 50%;
+  overflow: hidden;
+  color: #f1c40f;
+}
+.half-empty {
+  color: #ddd;
+}
+
+/* Rating Filter Highlight */
+.selected-rating {
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
 }
 </style>

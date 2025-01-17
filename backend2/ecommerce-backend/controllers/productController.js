@@ -120,130 +120,142 @@ exports.deleteProduct = async (req, res) => {
 };
 
 
-// exports.searchProducts = async (req, res) => {
-//   try {
-//     const { 
-//       query,
-//       minPrice,
-//       maxPrice,
-//       minRating,
-//       categories,
-//       limit = 15, // Default limit to 15
-//       page = 1
-//     } = req.query;
 
-//     const offset = (page - 1) * limit;
+const applyFilters = (queryOptions, filters) => {
+  const { query, minPrice, maxPrice, minRating, categories } = filters;
 
-//     // Base query options
-//     // const queryOptions = {
-//     //   include: [
-//     //     {
-//     //       model: Category,
-//     //       through: ProductCategory,
-//     //       attributes: ['id', 'name']
-//     //     },
-//     //     {
-//     //       model: Review, // Include the Review model
-//     //       attributes: [], // No need to fetch review details
-//     //     }
-//     //   ],
-//     //   where: {},
-//     //   limit: parseInt(limit),
-//     //   offset: parseInt(offset),
-//     //   attributes: {
-//     //     include: [
-//     //       [sequelize.fn('COUNT', sequelize.col('Reviews.id')), 'reviewCount'] // Count reviews
-//     //     ]
-//     //   },
-//     //   group: ['Product.id'], // Group by product ID
-//     //   subQuery: false // Disable subqueries to avoid issues with GROUP BY
-//     // };
-//     const queryOptions = {
-//       include: [
-//         {
-//           model: Category,
-//           through: ProductCategory,
-//           attributes: ['id', 'name']
-//         },
-//         {
-//           model: Review, // Include the Review model
-//           attributes: [], // No need to fetch review details
-//         }
-//       ],
-//       where: {},
-//       limit: parseInt(limit),
-//       offset: parseInt(offset),
-//       attributes: {
-//         include: [
-//           [sequelize.fn('COUNT', sequelize.col('Reviews.id')), 'reviewCount'] // Count reviews
-//         ]
-//       },
-//       group: [
-//         'Product.id', // Group by product ID
-//         'Categories.id', // Group by category ID
-//         'Categories->ProductCategory.productId', // Group by join table column
-//         'Categories->ProductCategory.categoryId' // Group by join table column
-//       ],
-//       subQuery: false // Disable subqueries to avoid issues with GROUP BY
-//     };
+  console.log('Applying filters:', filters); // Debugging
 
-//     // Apply search filters
-//     if (query) {
-//       queryOptions.where[Op.or] = [
-//         { 
-//           name: {
-//             [Op.iLike]: `%${query}%`
-//           }
-//         },
-//         {
-//           description: {
-//             [Op.iLike]: `%${query}%`
-//           }
-//         }
-//       ];
-//     }
+  // Apply search filters
+  if (query) {
+    queryOptions.where[Op.or] = [
+      // Full-text search for advanced matching
+      sequelize.where(
+        sequelize.fn('to_tsvector', sequelize.col('name')),
+        '@@',
+        sequelize.fn('to_tsquery', query.replace(/\s+/g, ' & ')) // Convert query to tsquery format
+      ),
+      sequelize.where(
+        sequelize.fn('to_tsvector', sequelize.col('description')),
+        '@@',
+        sequelize.fn('to_tsquery', query.replace(/\s+/g, ' & '))
+      ),
+      // ILIKE for partial matching
+      { 
+        name: {
+          [Op.iLike]: `%${query}%` // Search in product name
+        }
+      },
+      {
+        description: {
+          [Op.iLike]: `%${query}%` // Search in product description
+        }
+      }
+    ];
+  }
 
-//     // Price range filter
-//     if (minPrice || maxPrice) {
-//       queryOptions.where.price = {};
-//       if (minPrice) queryOptions.where.price[Op.gte] = minPrice;
-//       if (maxPrice) queryOptions.where.price[Op.lte] = maxPrice;
-//     }
+  // Price range filter
+  if (minPrice || maxPrice) {
+    queryOptions.where.price = {};
+    if (minPrice) queryOptions.where.price[Op.gte] = minPrice;
+    if (maxPrice) queryOptions.where.price[Op.lte] = maxPrice;
+  }
 
-//     // Rating filter
-//     if (minRating) {
-//       queryOptions.where.avgRating = {
-//         [Op.gte]: minRating
-//       };
-//     }
+  // Rating filter
+  if (minRating) {
+    queryOptions.where.avgRating = {
+      [Op.gte]: minRating
+    };
+  }
 
-//     // Category filter
-//     if (categories) {
-//       const categoryIds = categories.split(',').map(Number);
-//       queryOptions.include[0].where = {
-//         id: {
-//           [Op.in]: categoryIds
-//         }
-//       };
-//     }
+  // Category filter
+  if (categories) {
+    queryOptions.include = [
+      {
+        model: Category,
+        through: {
+          attributes: [] // Exclude join table columns from the result
+        },
+        attributes: ['id', 'name'],
+        where: {
+          id: {
+            [Op.in]: categories.split(',').map(Number)
+          }
+        }
+      }
+    ];
+  }
 
-//     const { count, rows } = await Product.findAndCountAll(queryOptions);
+  console.log('Query options after applying filters:', queryOptions); // Debugging
+  return queryOptions;
+};
 
-//     // Calculate total pages
-//     const totalPages = Math.ceil(count.length / limit);
+const fetchProducts = async (queryOptions) => {
+  console.log('Fetching products with query options:', queryOptions); // Debugging
 
-//     res.json({
-//       results: rows,
-//       total: count.length,
-//       page: parseInt(page),
-//       totalPages: totalPages
-//     });
+  // Step 1: Fetch unique product IDs
+  const productIdsQueryOptions = {
+    attributes: ['id'], // Fetch only product IDs
+    include: queryOptions.include, // Include the same associations
+    where: queryOptions.where, // Apply the same filters
+    limit: queryOptions.limit,
+    offset: queryOptions.offset,
+    subQuery: false // Disable subqueries to avoid issues with GROUP BY
+  };
 
-//   } catch (error) {
-//     console.error('Search error:', error);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// };
+  const productIdsResult = await Product.findAll(productIdsQueryOptions);
+  const productIds = productIdsResult.map(product => product.id);
+
+  // Step 2: Fetch full product details for the filtered product IDs
+  const productsQueryOptions = {
+    include: queryOptions.include, // Include the same associations
+    where: {
+      id: {
+        [Op.in]: productIds
+      }
+    }
+  };
+
+  return await Product.findAll(productsQueryOptions);
+};
+
+
+
+const countTotalProducts = async (queryOptions) => {
+  // Fetch unique product IDs
+  const productIdsQueryOptions = {
+    attributes: ['id'], // Fetch only product IDs
+    include: queryOptions.include, // Include the same associations
+    where: queryOptions.where, // Apply the same filters
+    subQuery: false // Disable subqueries to avoid issues with GROUP BY
+  };
+
+  const productIdsResult = await Product.findAll(productIdsQueryOptions);
+  return productIdsResult.length; // Return the total count of unique products
+};
+
+const applyCategoryFilter = (queryOptions, categories) => {
+  if (categories) {
+    queryOptions.include = [
+      {
+        model: Category,
+        through: {
+          attributes: [] // Exclude join table columns from the result
+        },
+        attributes: ['id', 'name'],
+        where: {
+          id: {
+            [Op.in]: categories.split(',').map(Number) // Convert categories to an array of numbers
+          }
+        }
+      }
+    ];
+  }
+
+  return queryOptions;
+};
+
+
 exports.searchProducts = async (req, res) => {
   try {
     const { 
@@ -252,95 +264,73 @@ exports.searchProducts = async (req, res) => {
       maxPrice,
       minRating,
       categories,
-      limit = 15, // Ensure this is 15
-      page = 1
     } = req.query;
-
-    const offset = (page - 1) * limit;
 
     // Base query options
     const queryOptions = {
       include: [
         {
-          model: Category,
-          through: {
-            attributes: [] // Exclude join table columns from the result
-          },
-          attributes: ['id', 'name']
+          model: Category, // Include the Category model
+          through: { attributes: [] }, // Exclude the join table attributes
+          attributes: ['id', 'name'], // Only include category ID and name
         },
-        {
-          model: Review, // Include the Review model
-          attributes: [], // No need to fetch review details
-        }
       ],
       where: {},
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      attributes: {
-        include: [
-          [sequelize.fn('COUNT', sequelize.col('Reviews.id')), 'reviewCount'] // Count reviews
-        ]
-      },
-      group: ['Product.id', 'Categories.id'], // Group by product ID and category ID
-      subQuery: false // Disable subqueries to avoid issues with GROUP BY
+      distinct: true, // Ensure unique products are returned
+      subQuery: false, // Disable subqueries to avoid issues with GROUP BY
     };
 
     // Apply search filters
-    if (query) {
-      queryOptions.where[Op.or] = [
-        { 
-          name: {
-            [Op.iLike]: `%${query}%`
-          }
-        },
-        {
-          description: {
-            [Op.iLike]: `%${query}%`
-          }
-        },
-        // Include category names in the search
-        {
-          '$Categories.name$': {
-            [Op.iLike]: `%${query}%`
-          }
+    const filters = { query, minPrice, maxPrice, minRating };
+    applyFilters(queryOptions, filters);
+
+    // Apply category filter (if categories are provided)
+    applyCategoryFilter(queryOptions, categories);
+
+    // Fetch all products without pagination
+    const products = await fetchProducts(queryOptions);
+
+    // Fetch reviews for all products
+    const productIds = products.map(product => product.id);
+    const reviews = await Review.findAll({
+      where: {
+        productId: {
+          [Op.in]: productIds
         }
-      ];
-    }
+      }
+    });
 
-    // Price range filter
-    if (minPrice || maxPrice) {
-      queryOptions.where.price = {};
-      if (minPrice) queryOptions.where.price[Op.gte] = minPrice;
-      if (maxPrice) queryOptions.where.price[Op.lte] = maxPrice;
-    }
+    // Group reviews by productId
+    const reviewsByProductId = reviews.reduce((acc, review) => {
+      if (!acc[review.productId]) {
+        acc[review.productId] = [];
+      }
+      acc[review.productId].push(review);
+      return acc;
+    }, {});
 
-    // Rating filter
-    if (minRating) {
-      queryOptions.where.avgRating = {
-        [Op.gte]: minRating
+    // Calculate avgRating and reviewCount for each product
+    const productsWithReviews = products.map(product => {
+      const productReviews = reviewsByProductId[product.id] || [];
+      const reviewCount = productReviews.length;
+      const avgRating = reviewCount > 0 
+        ? (productReviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount).toFixed(1)
+        : 0;
+
+      return {
+        ...product.toJSON(),
+        reviewCount,
+        avgRating,
+        categories: product.Categories, // Include categories in the response
       };
-    }
+    });
 
-    // Category filter
-    if (categories) {
-      const categoryIds = categories.split(',').map(Number);
-      queryOptions.include[0].where = {
-        id: {
-          [Op.in]: categoryIds
-        }
-      };
-    }
-
-    const { count, rows } = await Product.findAndCountAll(queryOptions);
-
-    // Calculate total pages
-    const totalPages = Math.ceil(count.length / limit);
+    // Count total products
+    const totalCount = await countTotalProducts(queryOptions);
 
     res.json({
-      results: rows,
-      total: count.length,
-      page: parseInt(page),
-      totalPages: totalPages
+      results: productsWithReviews,
+      total: totalCount,
     });
 
   } catch (error) {
@@ -349,7 +339,7 @@ exports.searchProducts = async (req, res) => {
   }
 };
 
-// controllers/productController.js
+
 exports.getSuggestions = async (req, res) => {
   try {
     const { query } = req.query;
@@ -361,8 +351,16 @@ exports.getSuggestions = async (req, res) => {
     const suggestions = await Product.findAll({
       where: {
         [Op.or]: [
-          { name: { [Op.iLike]: `%${query}%` } },
-          { description: { [Op.iLike]: `%${query}%` } }
+          sequelize.where(
+            sequelize.fn('to_tsvector', sequelize.col('name')),
+            '@@',
+            sequelize.fn('to_tsquery', query.replace(/\s+/g, ' & '))
+          ),
+          sequelize.where(
+            sequelize.fn('to_tsvector', sequelize.col('description')),
+            '@@',
+            sequelize.fn('to_tsquery', query.replace(/\s+/g, ' & '))
+          )
         ]
       },
       include: [{

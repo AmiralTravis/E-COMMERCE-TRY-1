@@ -99,18 +99,18 @@ exports.checkReviewEligibility = async (req, res) => {
 
 exports.getUserReview = async (req, res) => {
   const { productId } = req.params;
-  const userId = req.user.id;
+  const userId = req.user.id; // Ensure this is correctly set by the auth middleware
 
   try {
     const review = await Review.findOne({
       where: { productId, userId },
-      include: [{ model: User, attributes: ['username'] }]
+      include: [{ model: User, attributes: ['username'] }],
     });
-    
+
     if (!review) {
       return res.status(404).json({ error: 'Review not found' });
     }
-    
+
     res.json(review);
   } catch (error) {
     console.error('Error fetching user review:', error);

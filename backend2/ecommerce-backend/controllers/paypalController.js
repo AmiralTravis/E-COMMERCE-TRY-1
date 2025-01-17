@@ -20,7 +20,7 @@ const receiptService = new ReceiptService(transporter);
 async function verifyPaypalOrder(req, res) {
   console.log("Entering verifyPaypalOrder func...");
   console.log("Received Request Body:", req.body);
-  console.log("User:", req.user); // Verify user information
+  console.log("User:", req.user);
 
   try {
     const { orderId, totalAmount } = req.body;
@@ -33,7 +33,9 @@ async function verifyPaypalOrder(req, res) {
       where: { 
         userId: req.user.id,
         status: 'Pending'
-      }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 1
     });
 
     if (!pendingOrder) {
@@ -46,9 +48,8 @@ async function verifyPaypalOrder(req, res) {
 
     // 3. Validate PayPal response
     if (paypalOrder.result.status !== 'COMPLETED') {
-      console.error(`validate paypal respomse error: ${paypalOrder.result.status}`);
+      console.error(`validate paypal response error: ${paypalOrder.result.status}`);
       return res.status(400).json({ error: 'Payment not completed' });
-      
     }
 
     // 4. Verify amount matches
@@ -92,7 +93,6 @@ async function verifyPaypalOrder(req, res) {
       }
     } catch (emailError) {
       console.error('Error sending receipt email:', emailError);
-      // Optional: Log the error but don't block the response
     }
 
     return res.json({

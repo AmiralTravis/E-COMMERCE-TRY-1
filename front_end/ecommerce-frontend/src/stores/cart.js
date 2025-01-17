@@ -14,6 +14,9 @@ export const useCartStore = defineStore('cart', {
   getters: {
     itemCount: (state) => state.items.reduce((total, item) => total + item.quantity, 0),
     totalPrice: (state) => state.items.reduce((total, item) => total + (item.price * item.quantity), 0),
+    shipping: (state) => state.totalPrice >= 100 ? 0 : 10, // Free shipping for orders over $100
+    tax: (state) => state.totalPrice * 0.08, // 8% tax
+    total: (state) => state.totalPrice + state.shipping + state.tax // Total including shipping and tax
   },
 
   actions: {
@@ -221,44 +224,6 @@ export const useCartStore = defineStore('cart', {
       }
     },
 
-    // clearCart() {
-    //   this.items = [];
-    //   if (!useAuthStore().isAuthenticated) {
-    //     localStorage.removeItem('cart');
-    //   }
-    // }
-    // Add this new action to your cart store
-    // async clearCartAfterOrder() {
-    //   const authStore = useAuthStore();
-    //   this.loading = true;
-    //   this.error = null;
-
-    //   try {
-    //     // If user is authenticated, clear cart on the backend
-    //     if (authStore.isAuthenticated) {
-    //       // You'll need to implement this endpoint in your Node.js backend
-    //       await api.delete('/cart/clear');
-    //     }
-        
-    //     // Clear frontend state
-    //     this.items = [];
-        
-    //     // Clear localStorage if it exists
-    //     localStorage.removeItem('cart');
-        
-    //     console.log('Cart cleared after order placement');
-    //   } catch (error) {
-    //     console.error('Error clearing cart after order:', error);
-    //     this.error = 'Failed to clear cart';
-        
-    //     if (error.response?.status === 401) {
-    //       await authStore.refreshToken();
-    //       return this.clearCartAfterOrder();
-    //     }
-    //   } finally {
-    //     this.loading = false;
-    //   }
-    // }  
     async clearCart() {
       const authStore = useAuthStore();
       this.loading = true;

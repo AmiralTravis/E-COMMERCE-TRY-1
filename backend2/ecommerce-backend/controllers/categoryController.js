@@ -1,10 +1,26 @@
+// /controllers/categoryController.js
 const db = require('../config/db');
+const { Category } = require('../models'); // Import the Category model
 
 // Get all categories
 exports.getAllCategories = async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM "Categories"');
-    res.json(result.rows);
+    // Fetch all categories from the database
+    const categories = await Category.findAll();
+
+    // Separate main categories and subcategories
+    const mainCategories = categories.filter(cat => cat.isMainCategory);
+    const subCategories = categories.filter(cat => !cat.isMainCategory);
+
+    // Attach subcategories to their respective main categories
+    const result = mainCategories.map(mainCat => {
+      return {
+        ...mainCat.toJSON(),
+        subcategories: subCategories.filter(subCat => subCat.name.includes(mainCat.name)),
+      };
+    });
+
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch categories' });

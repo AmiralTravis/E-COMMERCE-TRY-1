@@ -4,32 +4,39 @@
     <div class="search-wrapper">
       <!-- Main search input -->
       <div class="search-input-wrapper">
-        <input 
-          type="text" 
-          v-model="searchQuery" 
+        <input
+          class="input-box"
+          type="text"
+          v-model="searchQuery"
           placeholder="Search products..."
-          @focus="handleFocus"
-          @keyup.enter="handleSearch"
           @input="handleInput"
+          @keyup.enter="handleSearch"
+          @focus="handleFocus"
+          @blur="handleBlur"
           ref="searchInput"
-        >
+        />
         <button class="search-button" @click="handleSearch">
-          <span class="search-icon">🔍</span>
+          <!-- Custom search icon -->
+          <img src="@/assets/search-icon.png" alt="Search" class="search-icon" />
         </button>
       </div>
 
-      <!-- Dropdown for suggestions and filters -->
+      <!-- Dropdown for suggestions and recent searches -->
       <div v-if="showDropdown" class="search-dropdown">
         <!-- Recent searches -->
         <div v-if="!searchQuery && recentSearches.length" class="recent-searches">
           <h3>Recent Searches</h3>
           <ul>
-            <li v-for="search in recentSearches" 
-                :key="search.query" 
-                @click="selectRecentSearch(search)">
+            <li
+              v-for="search in recentSearches"
+              :key="search.query"
+              @mousedown="selectRecentSearch(search)"
+            >
               <span class="history-icon">⏱️</span>
               {{ search.query }}
-              <button class="remove-history" @click.stop="removeFromHistory(search)">×</button>
+              <button class="remove-history" @mousedown.stop="removeFromHistory(search)">
+                ×
+              </button>
             </li>
           </ul>
         </div>
@@ -38,67 +45,18 @@
         <div v-if="searchQuery && suggestions.length" class="suggestions">
           <h3>Suggestions</h3>
           <ul>
-            <li v-for="suggestion in suggestions" 
-                :key="suggestion.id" 
-                @click="selectSuggestion(suggestion)">
+            <li
+              v-for="suggestion in suggestions"
+              :key="suggestion.id"
+              @mousedown="selectSuggestion(suggestion)"
+            >
               <span class="suggestion-icon">🏷️</span>
               {{ suggestion.name }}
-              <span class="suggestion-category">in {{ suggestion.category }}</span>
+              <span class="suggestion-category">
+                in {{ suggestion.Categories?.[0]?.name || 'General' }}
+              </span>
             </li>
           </ul>
-        </div>
-
-        <!-- Advanced filters -->
-        <div class="advanced-filters">
-          <h3>Filters</h3>
-          
-          <!-- Categories -->
-          <div class="category-filters">
-            <select v-model="filters.mainCategory" class="main-category-select">
-              <option value="">All Categories</option>
-              <option v-for="cat in mainCategories" 
-                      :key="cat.id" 
-                      :value="cat.id">
-                {{ cat.name }}
-              </option>
-            </select>
-            
-            <div v-if="filters.mainCategory" class="subcategories">
-              <label v-for="cat in subcategories" 
-                     :key="cat.id" 
-                     class="subcategory-checkbox">
-                <input type="checkbox" 
-                       v-model="filters.categories" 
-                       :value="cat.id">
-                {{ cat.name }}
-              </label>
-            </div>
-          </div>
-
-          <!-- Price range -->
-          <div class="price-range">
-            <input type="number" 
-                   v-model="filters.minPrice" 
-                   placeholder="Min Price"
-                   min="0"
-                   class="price-input">
-            <span class="price-separator">-</span>
-            <input type="number" 
-                   v-model="filters.maxPrice" 
-                   placeholder="Max Price"
-                   min="0"
-                   class="price-input">
-          </div>
-
-          <!-- Rating filter -->
-          <div class="rating-filter">
-            <select v-model="filters.minRating" class="rating-select">
-              <option value="">Min Rating</option>
-              <option v-for="n in 5" :key="n" :value="n">
-                {{ n }}+ Stars
-              </option>
-            </select>
-          </div>
         </div>
       </div>
     </div>
@@ -106,41 +64,23 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { useProductStore } from '../stores/products';
-import { useCategoryStore } from '../stores/category';
+import { ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useProductStore } from '../stores/products';
+import Fuse from 'fuse.js'; // Import Fuse.js for fuzzy search
 import debounce from 'lodash/debounce';
 
-export default defineComponent({
+export default {
   name: 'SearchBar',
-  
   setup() {
     const router = useRouter();
     const productStore = useProductStore();
-    const categoryStore = useCategoryStore();
-    
-    // Refs
+
     const searchQuery = ref('');
     const showDropdown = ref(false);
-    const searchInput = ref(null);
     const suggestions = ref([]);
     const recentSearches = ref([]);
-    
-    // Filters state
-    const filters = ref({
-      mainCategory: '',
-      categories: [],
-      minPrice: '',
-      maxPrice: '',
-      minRating: ''
-    });
-
-    // Computed
-    const mainCategories = computed(() => categoryStore.mainCategories);
-    const subcategories = computed(() => 
-      categoryStore.categories.filter(c => !c.isMainCategory)
-    );
+    const searchInput = ref(null); // Reference to the input element
 
     // Load recent searches from localStorage
     const loadRecentSearches = () => {
@@ -153,17 +93,13 @@ export default defineComponent({
     // Save search to history
     const saveToHistory = (query) => {
       if (!query) return;
-      
-      const newRecent = {
-        query,
-        timestamp: Date.now()
-      };
-      
+
+      const newSearch = { query, timestamp: Date.now() };
       recentSearches.value = [
-        newRecent,
-        ...recentSearches.value.filter(s => s.query !== query)
-      ].slice(0, 5);
-      
+        newSearch,
+        ...recentSearches.value.filter(s => s.query !== query),
+      ].slice(0, 5); // Keep only the last 5 searches
+
       localStorage.setItem('recentSearches', JSON.stringify(recentSearches.value));
     };
 
@@ -173,139 +109,92 @@ export default defineComponent({
       localStorage.setItem('recentSearches', JSON.stringify(recentSearches.value));
     };
 
-    // Fetch suggestions (debounced)
-    const fetchSuggestions = debounce(async (query) => {
-      if (!query || query.length < 2) {
-        suggestions.value = [];
-        return;
-      }
-      
-      try {
-        // Replace with your actual API call
-        const response = await productStore.fetchSuggestions(query);
-        suggestions.value = response.slice(0, 6); // Limit to 6 suggestions
-      } catch (error) {
-        console.error('Failed to fetch suggestions:', error);
+    // Debounced search input handler
+    const handleInput = debounce(async () => {
+      if (searchQuery.value.length >= 2) {
+        try {
+          // Use Fuse.js for fuzzy search suggestions
+          const fuse = new Fuse(productStore.products, {
+            keys: ['name', 'description'], // Search in name and description
+            threshold: 0.3, // Adjust threshold for typo tolerance
+            includeScore: true,
+          });
+
+          const results = fuse.search(searchQuery.value);
+          suggestions.value = results.map(result => result.item).slice(0, 6); // Limit to 6 suggestions
+        } catch (error) {
+          console.error('Failed to fetch suggestions:', error);
+          suggestions.value = [];
+        }
+      } else {
         suggestions.value = [];
       }
     }, 300);
 
     // Handle search execution
-    // const handleSearch = () => {
-    //   if (!searchQuery.value && !Object.values(filters.value).some(v => v)) {
-    //     return;
-    //   }
-
-    //   saveToHistory(searchQuery.value);
-      
-    //   // Navigate to products page with search params
-    //   router.push({
-    //     path: '/products',
-    //     query: {
-    //       search: searchQuery.value || undefined,
-    //       ...filters.value
-    //     }
-    //   });
-      
-    //   showDropdown.value = false;
-    // };
-
-
     const handleSearch = () => {
-      if (!searchQuery.value && !Object.values(filters.value).some(v => v)) {
-        return;
-      }
-
-      saveToHistory(searchQuery.value);
-
-      // Convert categories array to a comma-separated string
-      const categoriesQuery = filters.value.categories.length 
-        ? filters.value.categories.join(',') 
-        : undefined;
-
-      // Navigate to products page with search params
-      router.push({
-        path: '/products',
-        query: {
-          search: searchQuery.value || undefined,
-          categories: categoriesQuery,
-          minPrice: filters.value.minPrice || undefined,
-          maxPrice: filters.value.maxPrice || undefined,
-          minRating: filters.value.minRating || undefined
-        }
-      });
-
-      showDropdown.value = false;
-    };
-
-    // Input handlers
-    const handleInput = () => {
-      if (searchQuery.value.length >= 2) {
-        suggestions.value = productStore.getProducts.filter(p => 
-          p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-        ).slice(0, 6);
+      if (searchQuery.value) {
+        saveToHistory(searchQuery.value);
+        router.push({ path: '/products', query: { search: searchQuery.value } });
       } else {
-        suggestions.value = [];
+        router.push({ path: '/products' }); // Reset to no query
       }
+      showDropdown.value = false; // Close dropdown
+      searchInput.value.blur(); // Blur the input field to make it inactive
     };
 
-    const handleFocus = () => {
-      showDropdown.value = true;
-    };
-
+    // Select a suggestion
     const selectSuggestion = (suggestion) => {
       searchQuery.value = suggestion.name;
       handleSearch();
     };
 
+    // Select a recent search
     const selectRecentSearch = (search) => {
       searchQuery.value = search.query;
       handleSearch();
     };
 
-    // Close dropdown when clicking outside
-    const closeDropdown = (e) => {
-      if (!e.target.closest('.search-container')) {
-        showDropdown.value = false;
-      }
+    // Handle focus on input
+    const handleFocus = () => {
+      showDropdown.value = true; // Show dropdown when input is focused
     };
 
-    // Lifecycle hooks
-    onMounted(() => {
-      document.addEventListener('click', closeDropdown);
-      loadRecentSearches();
-      categoryStore.fetchCategories();
-    });
+    // Handle blur on input
+    const handleBlur = () => {
+      setTimeout(() => {
+        showDropdown.value = false; // Hide dropdown after a short delay
+      }, 200);
+    };
 
-    onUnmounted(() => {
-      document.removeEventListener('click', closeDropdown);
+    // Load recent searches on mount
+    onMounted(() => {
+      loadRecentSearches();
     });
 
     return {
       searchQuery,
-      searchInput,
       showDropdown,
       suggestions,
       recentSearches,
-      filters,
-      mainCategories,
-      subcategories,
-      handleSearch,
+      searchInput,
       handleInput,
-      handleFocus,
+      handleSearch,
       selectSuggestion,
       selectRecentSearch,
-      removeFromHistory
+      removeFromHistory,
+      handleFocus,
+      handleBlur,
     };
-  }
-});
+  },
+};
 </script>
 
 <style scoped>
 .search-container {
   position: relative;
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   margin: 0 auto;
 }
 
@@ -313,18 +202,22 @@ export default defineComponent({
   width: 100%;
 }
 
+.input-box {
+  background-color: rgb(219, 234, 211);
+}
+
 .search-input-wrapper {
   display: flex;
   align-items: center;
-  background: white;
-  border: 2px solid #e2e8f0;
+  background-color: rgb(168, 205, 148);
+  border: 4px solid rgb(36, 70, 19);
   border-radius: 8px;
   overflow: hidden;
   transition: all 0.3s ease;
 }
 
 .search-input-wrapper:focus-within {
-  border-color: #3b82f6;
+  border-color: #137d09;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -338,7 +231,7 @@ export default defineComponent({
 
 .search-button {
   padding: 12px 20px;
-  background: #3b82f6;
+  background: rgb(138, 113, 72);
   border: none;
   color: white;
   cursor: pointer;
@@ -346,11 +239,13 @@ export default defineComponent({
 }
 
 .search-button:hover {
-  background: #2563eb;
+  background: #ae926c;
 }
 
 .search-icon {
-  font-size: 18px;
+  width: 25px; /* Adjust the size as needed */
+  height: 25px; /* Adjust the size as needed */
+  vertical-align: middle; /* Align the icon properly */
 }
 
 .search-dropdown {
@@ -416,54 +311,5 @@ export default defineComponent({
 
 .remove-history:hover {
   color: #ef4444;
-}
-
-.advanced-filters {
-  padding: 16px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.category-filters,
-.price-range,
-.rating-filter {
-  margin-bottom: 16px;
-}
-
-.main-category-select,
-.rating-select,
-.price-input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  margin-bottom: 8px;
-}
-
-.subcategories {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.subcategory-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.price-range {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.price-separator {
-  color: #6b7280;
-}
-
-.price-input {
-  flex: 1;
 }
 </style>
