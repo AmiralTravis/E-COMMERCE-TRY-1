@@ -1,4 +1,4 @@
-<!-- components/PaymentPage.vue -->
+<!-- /components/PaymentPage.vue -->
 <template>
   <div class="payment-page">
     <div class="order-summary">
@@ -33,23 +33,24 @@
       </div>
 
       <!-- Shipping Details -->
-      <div v-if="addresses.length > 0" class="shipping-details">
+      <div v-if="selectedAddress" class="shipping-details">
         <h3>Shipping Information</h3>
-        <div class="shipping-info" v-for="address in addresses" :key="address.id">
-          <p v-if="address.fullName"><strong>Name:</strong> {{ address.fullName }}</p>
-          <p v-if="address.email"><strong>Email:</strong> {{ address.email }}</p>
-          <p v-if="address.phoneNumber"><strong>Phone:</strong> {{ address.phoneNumber }}</p>
-          <p v-if="address.addressLine1">
-            <strong>Address:</strong> {{ address.addressLine1 }}
-            {{ address.addressLine2 ? ', ' + address.addressLine2 : '' }}
+        <div class="shipping-info">
+          <p v-if="selectedAddress.fullName"><strong>Name:</strong> {{ selectedAddress.fullName }}</p>
+          <p v-if="selectedAddress.email"><strong>Email:</strong> {{ selectedAddress.email }}</p>
+          <p v-if="selectedAddress.phoneNumber"><strong>Phone:</strong> {{ selectedAddress.phoneNumber }}</p>
+          <p v-if="selectedAddress.addressLine1">
+            <strong>Address:</strong> {{ selectedAddress.addressLine1 }}
+            {{ selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : '' }}
           </p>
-          <p v-if="address.city || address.state || address.postalCode">
-            {{ address.city }}, 
-            {{ address.state }} 
-            {{ address.postalCode }}
+          <p v-if="selectedAddress.city || selectedAddress.state || selectedAddress.postalCode">
+            {{ selectedAddress.city }},
+            {{ selectedAddress.state }}
+            {{ selectedAddress.postalCode }}
           </p>
-          <p v-if="address.country"><strong>Country:</strong> {{ address.country }}</p>
+          <p v-if="selectedAddress.country"><strong>Country:</strong> {{ selectedAddress.country }}</p>
         </div>
+        <button @click="changeAddress" class="change-address-btn">Change Address</button>
       </div>
 
       <!-- PayPal Button -->
@@ -59,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCartStore } from '../stores/cart';
 import { useAuthStore } from '../stores/auth';
@@ -71,13 +72,28 @@ const router = useRouter();
 
 const shippingDetails = ref(null);
 const addresses = ref([]);
+const selectedAddress = ref(null);
+const loadedFromStorage = ref(false);
+
 
 // Use cart store getters for shipping, tax, and total
 const shipping = computed(() => cartStore.shipping);
 const tax = computed(() => cartStore.tax);
 const total = computed(() => cartStore.total);
 
+// Fetch addresses and set the default selected address
+// const fetchAddresses = async () => {
+//   try {
+//     const response = await api.get(`/addresses/user-addresses/${authStore.user.id}`);
+//     addresses.value = response.data;
+//     selectedAddress.value = addresses.value.find(address => address.isDefault);
+//   } catch (error) {
+//     console.error('Error fetching addresses:', error);
+//   }
+// };
 const fetchAddresses = async () => {
+  if (loadedFromStorage.value) return;
+  
   try {
     const response = await api.get(`/addresses/user-addresses/${authStore.user.id}`);
     addresses.value = response.data;
@@ -86,17 +102,9 @@ const fetchAddresses = async () => {
   }
 };
 
-const setDefaultAddress = async (addressId) => {
-  try {
-    await api.post('/addresses/save-address', {
-      userId: authStore.user.id,
-      isDefault: true,
-      id: addressId
-    });
-    await fetchAddresses();
-  } catch (error) {
-    console.error('Error setting default address:', error);
-  }
+// Navigate back to the address selection page
+const changeAddress = () => {
+  router.push('/checkout/address');
 };
 
 // Create the order in the backend before PayPal starts
@@ -123,6 +131,7 @@ const handleSubmit = async () => {
   }
 };
 
+// Load PayPal button and set up payment flow
 const loadPayPalButton = () => {
   window.paypal.Buttons({
     createOrder: async (data, actions) => {
@@ -185,9 +194,38 @@ const loadPayPalButton = () => {
   }).render('#paypal-button-container');
 };
 
+
+
+
+
+
+// Keep selected address in sessionStorage until explicitly cleared
+onMounted(() => {
+  const routeState = router.currentRoute.value.state;
+  const storedAddress = sessionStorage.getItem('selectedAddress');
+
+  if (routeState?.selectedAddress) {
+    sessionStorage.setItem('selectedAddress', JSON.stringify(routeState.selectedAddress));
+    selectedAddress.value = routeState.selectedAddress;
+  } else if (storedAddress) {
+    selectedAddress.value = JSON.parse(storedAddress);
+  } else {
+    fetchAddresses().then(() => {
+      selectedAddress.value = addresses.value.find(a => a.isDefault);
+    });
+  }
+});
+
+// Clear storage when leaving payment page
+onBeforeUnmount(() => {
+  if (!router.currentRoute.value.path.includes('/checkout/payment')) {
+    sessionStorage.removeItem('selectedAddress');
+  }
+});
+
 onMounted(async () => {
   await cartStore.fetchCart();
-  await fetchAddresses(); // Fetch addresses on mount
+  // await fetchAddresses();
 
   const paypalScript = document.createElement('script');
   paypalScript.src = "https://www.paypal.com/sdk/js?client-id=AceJUHWaafcPScT9WEkm0eDlocn_7QBvYEH2xHX0dOIcqCIopSWz9WaQYzglzSuD0XNmtLQ5sAXkuC9c";
@@ -258,6 +296,16 @@ h2 {
   margin-bottom: 1rem;
   border-bottom: 2px solid #007bff;
   padding-bottom: 0.5rem;
+}
+
+.change-address-btn {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

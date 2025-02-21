@@ -1,7 +1,13 @@
-// models/usersModels.js
+// // models/usersModels.js
 
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define('User', {
+    id: { // Add this
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+      allowNull: false // ID should never be null
+    },
     username: {
       type: DataTypes.STRING,
       unique: true,
@@ -21,6 +27,24 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'user',
     },
+
+    profilePicUrl: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: function() {
+        // Ensure absolute URL in database
+        return `${process.env.BASE_URL}/generated-avatars/generated-${this.id}.png`;
+      }
+    },
+    // Add these fields to your User model definition
+    resetPasswordToken: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    resetPasswordExpires: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
   }, {
     timestamps: true,
     freezeTableName: true,
@@ -30,15 +54,15 @@ module.exports = (sequelize, DataTypes) => {
     },
   });
 
-  // Instance method to check if the user is a superadmin
   User.prototype.isSuperAdmin = function() {
     return this.role === 'superadmin';
   };
 
-  // Instance method to check if the user is an admin or superadmin
   User.prototype.isAdminOrSuperAdmin = function() {
     return this.role === 'admin' || this.role === 'superadmin';
   };
+
+  
 
   return User;
 };

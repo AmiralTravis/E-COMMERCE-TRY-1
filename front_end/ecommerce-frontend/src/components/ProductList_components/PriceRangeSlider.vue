@@ -1,32 +1,9 @@
 <!-- /components/PriceRangeSlider.vue -->
 <template>
   <div class="price-range-slider">
-    <!-- Price Input Fields -->
-    <div class="price-input-container">
-      <div class="price-input">
-        <div class="price-field">
-          <span>Minimum Price</span>
-          <input
-            type="number"
-            v-model="minPrice"
-            :min="min"
-            :max="max"
-            @input="updateMinPrice"
-          />
-        </div>
-        <div class="price-field">
-          <span>Maximum Price</span>
-          <input
-            type="number"
-            v-model="maxPrice"
-            :min="min"
-            :max="max"
-            @input="updateMaxPrice"
-          />
-        </div>
-      </div>
-    </div>
-
+    
+    <h3 class="price-range-text">Price Range</h3>
+          
     <!-- Slider Track -->
     <div class="slider-container">
       <div class="price-slider" :style="sliderStyle"></div>
@@ -155,9 +132,14 @@ export default {
 </script>
 
 <style scoped>
+.price-range-text{
+  margin: 0px 0px 20px;
+}
+
 .price-range-slider {
   width: 100%;
-  padding: 10px;
+  padding: 15px 10px;
+  /* padding-top: 50px; */
   /* background: white; */
   background-color: rgb(254, 244, 234);
 

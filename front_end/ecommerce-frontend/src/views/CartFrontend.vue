@@ -130,6 +130,8 @@
   import { useCartStore } from '../stores/cart';
   import { useAuthStore } from '../stores/auth';
   import { useRouter } from 'vue-router';
+  import api from '../services/api';
+
   
   export default defineComponent({
     name: 'CartFrontend',
@@ -221,14 +223,50 @@
         }
       };
   
-      const proceedToCheckout = () => {
-        if (!authStore.isAuthenticated) {
-          router.push('/login?redirect=/checkout');
-          return;
-        }
-        router.push('/checkout');
-      };
-  
+      // const proceedToCheckout = () => {
+      //   if (!authStore.isAuthenticated) {
+      //     router.push('/login?redirect=/checkout');
+      //     return;
+      //   }
+      //   router.push('/checkout');
+      // };
+//       const proceedToCheckout = () => {
+//     if (!authStore.isAuthenticated) {
+//         router.push('/login?redirect=/checkout/address'); // Redirect to /checkout/address
+//         return;
+//     }
+//     router.push('/checkout/address'); // Push /checkout/address
+// };
+// const proceedToCheckout = async () => {
+//   if (!authStore.isAuthenticated) {
+//     router.push('/login?redirect=/checkout/address');
+//     return;
+//   }
+
+//   try {
+//     const response = await api.get(`/addresses/user-addresses/${authStore.user.id}`);
+//     const addresses = response.data;
+//     const defaultAddress = addresses.find(address => address.isDefault);
+
+//     if (defaultAddress) {
+//       router.push('/checkout/payment');
+//     } else {
+//       router.push('/checkout/address');
+//     }
+//   } catch (error) {
+//     console.error('Error fetching addresses:', error);
+//     router.push('/checkout/address');
+//   }
+// };
+const proceedToCheckout = async () => {
+  if (!authStore.isAuthenticated) {
+    router.push('/login?redirect=/checkout/address');
+    return;
+  }
+
+  // Direct to checkout flow - let navigation guards handle address checks
+  router.push('/checkout/address');
+};
       return {
         cartItems,
         subtotal,

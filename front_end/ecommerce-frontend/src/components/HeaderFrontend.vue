@@ -1,4 +1,5 @@
 <!-- components/HeaderFrontend.vue -->
+<!-- components/HeaderFrontend.vue -->
 <template>
   <header class="header">
     <nav class="nav">
@@ -8,21 +9,38 @@
       </router-link>
       <SearchBar :categories="categories" />
       <div class="nav-links">
-        <router-link to="/products">Products</router-link>
-        <router-link to="/cart" class="cart-link">
-          Cart
-          <span v-if="cartItemCount" class="cart-count">{{ cartItemCount }}</span>
+        <router-link to="/products" class="products-link" @click.native="resetFilters">Products</router-link>
+        <router-link to="/cart" class="cart-link flex items-center space-x-2 px-4 py-2 rounded-md">
+          <div class="relative">
+            <span 
+              v-if="cartItemCount" 
+              class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+            >
+              {{ cartItemCount }}
+            </span>
+            <img src="@/assets/cart-icon.png" alt="Cart" class="cart-icon" />
+          </div>
+          <span class="cart-text font-medium hide-on-mobile">Cart</span>
         </router-link>
         <template v-if="isAuthenticated">
-          <router-link v-if="isSuperAdmin || isAdmin" to="/admin">
-            {{ isSuperAdmin ? 'Superadmin' : 'Admin' }} Dashboard
+          <router-link v-if="isSuperAdmin || isAdmin" to="/admin" class="admin-link">
+            {{ isSuperAdmin ? 'Superadmin' : 'Admin' }}
           </router-link>
           <div class="user-nav-container" @mouseover="showDropdown = true" @mouseleave="showDropdown = false">
             <div class="user-nav">
               <div class="avatar">
-                <span class="avatar-initials">{{ userInitials }}</span>
+                <template v-if="profilePicUrl">
+                  <img 
+                    :src="profilePicUrl" 
+                    alt="User Avatar" 
+                    class="avatar-image"
+                  />
+                </template>
+                <template v-else>
+                  <span class="avatar-initials">{{ userInitials }}</span>
+                </template>
               </div>
-              <span class="username">{{ username }}</span>
+              <span class="username hide-on-mobile">{{ authStore.user.username }}</span>
             </div>
             <!-- Dropdown Menu -->
             <div v-show="showDropdown" class="dropdown-menu">
@@ -42,11 +60,17 @@
           </div>
         </template>
         <template v-else>
-          <div class="user-nav">
-            <div class="avatar">
-              <span class="avatar-initials">G</span>
+          <div class="user-nav-container">
+            <div class="user-nav">
+              <div class="avatar">
+                <img 
+                  :src="guestAvatar" 
+                  alt="Guest" 
+                  class="avatar-image"
+                />
+              </div>
+              <span class="username hide-on-mobile">Guest</span>
             </div>
-            <span class="username">Guest</span>
           </div>
           <router-link to="/login" class="login-btn">Login</router-link>
         </template>
@@ -83,12 +107,14 @@
 </template>
 
 <script>
-import { defineComponent, computed, ref } from 'vue';
+import { defineComponent, computed, ref, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useCartStore } from '../stores/cart';
 import { useRouter } from 'vue-router';
 import SearchBar from './SearchBar.vue';
 import { useCategoryStore } from '../stores/category';
+import { useFilterStore } from '../stores/useFilterStore';
+import guestAvatar from '@/assets/guest-avatar.png';
 
 export default defineComponent({
   name: 'HeaderFrontend',
@@ -99,6 +125,7 @@ export default defineComponent({
     const authStore = useAuthStore();
     const cartStore = useCartStore();
     const router = useRouter();
+    const filterStore = useFilterStore();
 
     const showDropdown = ref(false);
     const showNotifications = ref(false);
@@ -108,6 +135,24 @@ export default defineComponent({
       { id: 2, message: 'New products available', time: '1 day ago', read: true }
     ]);
 
+    // Create a ref for profile picture URL
+    const profilePicUrl = ref('');
+
+    // Watch for changes in the user's profile picture
+    watch(
+      () => authStore.user?.profilePicUrl,
+      (newUrl) => {
+        if (newUrl) {
+          // Add a timestamp query parameter to force refresh
+          const separator = newUrl.includes('?') ? '&' : '?';
+          profilePicUrl.value = `${newUrl}${separator}t=${Date.now()}`;
+        } else {
+          profilePicUrl.value = '';
+        }
+      },
+      { immediate: true }
+    );
+
     const unreadNotifications = computed(() => 
       notifications.value.filter(n => !n.read).length
     );
@@ -116,9 +161,9 @@ export default defineComponent({
     const isAdmin = computed(() => authStore.isAdmin);
     const isSuperAdmin = computed(() => authStore.isSuperAdmin);
     const cartItemCount = computed(() => cartStore.itemCount);
-    const username = computed(() => authStore.user?.username || '');
+
     const userInitials = computed(() => {
-      const name = username.value;
+      const name = authStore.user?.username || '';
       return name ? name.charAt(0).toUpperCase() : '';
     });
 
@@ -139,13 +184,18 @@ export default defineComponent({
     const categoryStore = useCategoryStore();
     const categories = computed(() => categoryStore.categories);
 
+    const resetFilters = () => {
+      filterStore.resetFilters();
+      router.push({ path: '/products', query: {} });
+    };
+
     return {
+      authStore,
       isAuthenticated,
       isAdmin,
       isSuperAdmin,
       cartItemCount,
       handleLogout,
-      username,
       userInitials,
       showDropdown,
       showNotifications,
@@ -153,24 +203,29 @@ export default defineComponent({
       unreadNotifications,
       toggleNotifications,
       markAllAsRead,
-      categories
+      categories,
+      resetFilters,
+      guestAvatar,
+      profilePicUrl
     };
   }
 });
 </script>
 
+<!-- Keep your existing styles -->
+
 <style scoped>
 .header {
   background-color: #04221F;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  padding: 10px;
+  padding: 5px;
 }
 
 .nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1350px;
+  max-width: 1650px;
   margin: 0 auto;
 }
 
@@ -178,12 +233,17 @@ export default defineComponent({
   font-size: 1.5rem;
   font-weight: bold;
   color: #b8be5e;
+  /* max-width: 185px; */
   text-decoration: none;
 }
 
 .logo-image {
-  height: 60px; /* Adjust the height as needed */
+  height: 55px; /* Adjust the height as needed */
   width: auto; /* Maintain aspect ratio */
+  min-width: 165px;
+  /* margin: auto; */
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 .nav-links {
@@ -195,7 +255,7 @@ export default defineComponent({
 .nav-links a {
   color: #ebebeb;
   text-decoration: none;
-  padding: 0.5rem 1rem;
+  padding: 0.25rem 0.75rem;
   border-radius: 4px;
   transition: background-color 0.3s;
 }
@@ -204,20 +264,33 @@ export default defineComponent({
   background-color: #214e0f;
 }
 
+.products-link{
+  margin-left: 10px;
+}
+
 .cart-link {
   position: relative;
+  padding: 2px 6px;
 }
+
 
 .cart-count {
   position: absolute;
   top: -8px;
-  right: -8px;
+  right: 0px;
   background-color: #e74c3c;
   color: white;
   border-radius: 50%;
   padding: 2px 6px;
   font-size: 12px;
 }
+
+.cart-icon {
+  max-width: 35px; /* Adjust the size as needed */
+  height: 35px; /* Adjust the size as needed */
+  vertical-align: middle; /* Align the icon properly */
+}
+
 
 .login-btn, .logout-btn {
   background-color: #3498db;
@@ -240,7 +313,7 @@ export default defineComponent({
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  background-color: rgb(17, 45, 4);
+  background-color: #04221F;
 }
 
 .avatar {
@@ -288,7 +361,7 @@ export default defineComponent({
   background-color: hsl(0, 0%, 100%);
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  width: 200px;
+  width: 150px;
   z-index: 1000;
 }
 
@@ -329,6 +402,7 @@ export default defineComponent({
   position: relative;
   padding: 0.5rem;
   font-size: 1.25rem;
+  margin-right: 10px;
 }
 
 .notification-badge {
@@ -408,5 +482,122 @@ export default defineComponent({
   padding: 1rem;
   text-align: center;
   color: #666;
+}
+
+
+@media (max-width: 1024px) {
+  .hide-on-mobile {
+    display: none;
+  }
+  
+  .logo-image {
+    height: 50px;
+    min-width: 150px;
+  }
+
+  .cart-link {
+    padding: 0.5rem !important;
+  }
+
+  .nav-links {
+    gap: 0.5rem;
+  }
+
+  .products-link {
+    margin-left: 5px;
+  }
+
+  .notification-icon {
+    margin-right: 5px;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .cart-icon {
+    min-width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav {
+    padding: 0.5rem;
+  }
+
+  .logo-image {
+    height: 40px;
+    min-width: 120px;
+  }
+
+  .cart-icon {
+    min-width: 28px;
+    height: 28px;
+  }
+
+  .avatar {
+    width: 24px;
+    height: 24px;
+  }
+
+  .avatar-initials {
+    font-size: 12px;
+  }
+
+  .notification-icon {
+    font-size: 1rem;
+    padding: 0.25rem;
+  }
+
+  .admin-link {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #795a36;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.avatar-initials {
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.user-nav-container {
+  position: relative;
+  cursor: pointer;
+}
+
+.user-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background-color: #04221F;
+}
+
+.username {
+  color: #cea532;
+  font-size: 14px;
 }
 </style>

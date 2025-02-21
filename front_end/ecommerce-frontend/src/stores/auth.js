@@ -1,3 +1,7 @@
+
+
+
+
 // stores/auth.js
 
 import { defineStore } from 'pinia';
@@ -7,9 +11,8 @@ import { useCartStore } from './cart';
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
-    authStatus: 'pending',
-    isRefreshing: false,
-    token: null,
+    authStatus: 'pending', // 'pending', 'authenticated', 'unauthenticated'
+    isRefreshing: false, // To handle token refresh race conditions
   }),
 
   getters: {
@@ -25,12 +28,8 @@ export const useAuthStore = defineStore('auth', {
         const response = await api.post('/auth/register', userData);
         console.log('Registration response:', response.data);
 
-        const { user, accessToken, refreshToken } = response.data;
-
+        const { user } = response.data; // Tokens are handled via cookies
         this.setAuth(user);
-        this.token = accessToken;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
 
         const cartStore = useCartStore();
         await cartStore.syncLocalCartWithServer();
@@ -50,17 +49,8 @@ export const useAuthStore = defineStore('auth', {
         const response = await api.post('/auth/login', credentials);
         console.log('Login response:', response.data);
 
-        const { user, accessToken, refreshToken } = response.data;
-
-        console.log('User role:', user.role);
-
+        const { user } = response.data; // Tokens are handled via cookies
         this.setAuth(user);
-        this.token = accessToken;
-        console.log('Access token set:', this.token);
-
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-        console.log('Tokens stored in localStorage');
 
         const cartStore = useCartStore();
         await cartStore.syncLocalCartWithServer();
@@ -86,24 +76,22 @@ export const useAuthStore = defineStore('auth', {
         return false;
       }
     },
-      
-    async checkAuth() {
-      const tokenExists = localStorage.getItem('accessToken');
-      console.log('Token exists:', tokenExists);
-      if (!tokenExists) {
-        this.authStatus = 'unauthenticated';
-        this.user = null;
-        return false;
-      }
-      
-      try {
-        return await this.verifyUser();
-      } catch (error) {
-        console.error('Error verifying user:', error);
-        this.clearAuth();
-        return false;
-      }
-    },
+
+
+async checkAuth() {
+  try {
+    if (this.authStatus === 'authenticated') return true;
+    
+    const success = await this.verifyUser();
+    if (!success && !this.isRefreshing) {
+      await this.refreshToken();
+    }
+    return this.isAuthenticated;
+  } catch (error) {
+    this.clearAuth();
+    return false;
+  }
+},
 
     async refreshToken() {
       if (this.isRefreshing) {
@@ -116,15 +104,11 @@ export const useAuthStore = defineStore('auth', {
           }, 100);
         });
       }
-        
+
       this.isRefreshing = true;
       try {
-        const response = await api.post('/auth/refresh', {
-          refreshToken: localStorage.getItem('refreshToken'),
-        });
-        this.setAuth(response.data.user);
-        this.token = response.data.accessToken;
-        localStorage.setItem('accessToken', this.token);
+        const response = await api.post('/auth/refresh');
+        this.setAuth(response.data.user); // Tokens are handled via cookies
         return response;
       } catch (error) {
         this.clearAuth();
@@ -133,14 +117,12 @@ export const useAuthStore = defineStore('auth', {
         this.isRefreshing = false;
       }
     },
-        
+
     async logout() {
       try {
         await api.post('/auth/logout');
       } finally {
         this.clearAuth();
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         const cartStore = useCartStore();
         cartStore.clearCart();
       }
@@ -155,16 +137,35 @@ export const useAuthStore = defineStore('auth', {
     clearAuth() {
       this.user = null;
       this.authStatus = 'unauthenticated';
-      this.token = null;
       console.log('Auth cleared');
       const cartStore = useCartStore();
       cartStore.fetchCart();
     },
 
+    async updateProfile(userData) {
+      try {
+        console.log('Updating user with ID:', this.user.id);
+        console.log('Sending data:', userData);
+        const response = await api.put(`/users/${this.user.id}`, userData);
+        console.log('Update response:', response.data);
+        const updatedUser = response.data;
+        this.setAuth(updatedUser);
+        return updatedUser;
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        throw error;
+      }
+    },
+
     async fetchUserData() {
       try {
         const response = await api.get('/users/me');
-        return response.data;
+        this.user = {
+          ...response.data,
+          profilePicUrl: response.data.profilePicUrl.includes('://')
+            ? response.data.profilePicUrl
+            : `${import.meta.env.VITE_API_URL}${response.data.profilePicUrl}`,
+        };
       } catch (error) {
         console.error('Error fetching user data:', error);
         throw error;

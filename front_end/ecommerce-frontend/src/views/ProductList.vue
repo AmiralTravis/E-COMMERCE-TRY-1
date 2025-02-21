@@ -1,23 +1,20 @@
 <!-- /views/ProductList.vue -->
 <template>
+  <div class="products-container-wrapper">
   <div class="products-container">
     <!-- Side Panel -->
     <SidePanel
       :categories="categories"
-      :initialFilters="{
-        rating: selectedRatings.length > 0 ? selectedRatings[0] : 0,
-        categories: selectedCategories,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
-      }"
+      :initialFilters="filterStore.filters"
       @apply-filters="applyFilters"
       @clear-filters="clearFilters"
+      class="side-panel"
     />
 
     <!-- Product List -->
     <div class="products-list">
       <!-- Display products -->
-      <div v-for="product in paginatedProducts" :key="product.id" class="product-card">
+      <div v-for="product in paginatedProducts" :key="product.id" class="product-card relative">
         <div class="product-image-container">
           <img 
             :src="`${product.imageUrl}`" 
@@ -25,68 +22,111 @@
             class="product-image" 
             loading="lazy"
           />
+          
+          <div class="absolute top-3 left-3">
+          <div 
+            v-if="product.discountPercentage" 
+            class="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-md mb-2"
+          >
+            -{{ product.discountPercentage }}% Off
+          </div>
+        </div>
+
+        <div class="absolute bottom-3 left-3">
+          <div 
+            v-if="isBestSeller(product)" 
+            class="bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-md"
+          >
+            Best Seller
+          </div>
+        </div>
+          
         </div>
         <div class="product-info">
           <a :href="`/products/${product.id}`" target="_blank" class="product-name">
             {{ product.name }}
           </a>
-          <!-- Star Rating -->
-          <div class="star-rating-container">
-            <div class="star-rating" @mouseover="showRatingDistribution(product)" @mouseleave="hideRatingDistribution">
-              <div class="stars flex gap-1">
-                <span v-for="star in 5" :key="star" class="star text-xl">
-                  <!-- Full Star -->
-                  <span v-if="star <= Math.floor(product.avgRating)" class="full-star text-yellow-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  </span>
-                  <!-- Partial Star -->
-                  <span v-else-if="star === Math.ceil(product.avgRating) && product.avgRating % 1 !== 0" class="partial-star">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <defs>
-                        <linearGradient :id="`partial-star-gradient-${product.id}-${star}`" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stop-color="#f1c40f" />
-                          <stop :offset="`${(product.avgRating % 1) * 100}%`" stop-color="#f1c40f" />
-                          <stop :offset="`${(product.avgRating % 1) * 100}%`" stop-color="#ddd" />
-                          <stop offset="100%" stop-color="#ddd" />
-                        </linearGradient>
-                      </defs>
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" :fill="`url(#partial-star-gradient-${product.id}-${star})`" />
-                    </svg>
-                  </span>
-                  <!-- Empty Star -->
-                  <span v-else class="empty-star text-gray-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  </span>
+          
+          <!-- Star Rating and Review Count (Hover Trigger) -->
+          <div
+            class="star-rating-container relative flex items-center gap-2"
+            @mouseover="showReviewBox(product.id)"
+            @mouseleave="hideReviewBox"
+          >
+            <!-- Stars -->
+            <div class="stars flex gap-1">
+              <span v-for="star in 5" :key="star" class="star text-xl">
+                <!-- Full Star -->
+                <span v-if="star <= Math.floor(product.avgRating)" class="full-star text-yellow-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
                 </span>
-              </div>
-              <span class="rating-text">
-                ({{ (Number(product.avgRating) || 0).toFixed(1) }})
-              </span>
-              <span class="review-count">
-                {{ product.reviewCount || 0 }} reviews
+                <!-- Partial Star -->
+                <span v-else-if="star === Math.ceil(product.avgRating) && product.avgRating % 1 !== 0" class="partial-star">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <defs>
+                      <linearGradient :id="`partial-star-gradient-${product.id}-${star}`" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#f1c40f" />
+                        <stop :offset="`${(product.avgRating % 1) * 100}%`" stop-color="#f1c40f" />
+                        <stop :offset="`${(product.avgRating % 1) * 100}%`" stop-color="#ddd" />
+                        <stop offset="100%" stop-color="#ddd" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" :fill="`url(#partial-star-gradient-${product.id}-${star})`" />
+                  </svg>
+                </span>
+                <!-- Empty Star -->
+                <span v-else class="empty-star text-gray-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </span>
               </span>
             </div>
-            <!-- Rating Distribution Box -->
-            <div v-if="hoveredProductId === product.id" class="rating-distribution-box">
-              <div v-for="n in 5" :key="n" class="rating-bar">
-                <span class="rating-label">{{ 6 - n }}★</span>
-                <div class="bar-container">
-                  <div class="bar" :style="{ width: `${(product.ratingDistribution?.[6 - n] / product.reviewCount) * 100 || 0}%` }"></div>
-                </div>
-                <span class="rating-count">{{ product.ratingDistribution?.[6 - n] || 0 }}</span>
-              </div>
-              <button @click="redirectToReviews(product.id)" class="see-details-btn">See Details</button>
+
+            <!-- Rating Number -->
+            <span class="rating-number text-sm text-gray-500">
+              ({{ (Number(product.avgRating) || 0).toFixed(1) }})
+            </span>
+
+            <!-- Review Count -->
+            <span class="review-count text-sm text-gray-500">
+              {{ product.reviewCount || 0 }} reviews
+            </span>
+
+            <!-- Review Box (Shown on Hover) -->
+            <div
+              v-show="hoveredProductId === product.id"
+              class="review-box absolute left-full top-0 z-10 transition-opacity duration-300 ease-in-out opacity-100 border-2 border-red-500 bg-blue-100"
+            >
+              <ReviewBox
+                :avgRating="Number(product.avgRating)"
+                :totalReviews="product.reviewCount"
+                :ratingDistribution="product.ratingDistribution"
+                :productId="product.id"
+              />
             </div>
           </div>
           <!-- Delivery Date -->
           <p class="delivery-date">
             {{ product.price >= 100 ? 'Free delivery by' : 'Delivered by' }} {{ calculateDeliveryDate() }}
           </p>
-          <p class="product-price">${{ product.price.toFixed(2) }}</p>
+          
+          <div class="flex items-baseline gap-2 mb-4">
+                <span v-if="product.discountPercentage" class="text-2xl font-bold text-green-500">
+                  ${{ (product.price * (1 - product.discountPercentage/100)).toFixed(2) }}
+                </span>
+                <span 
+                  :class="[
+                    product.discountPercentage 
+                      ? 'text-sm text-red-700 line-through' 
+                      : 'text-2xl font-bold text-green-500'
+                  ]"
+                >
+                  ${{ product.price.toFixed(2) }}
+                </span>
+              </div>
           <button @click="addToCart(product)" class="add-to-cart-btn">
             Add to Cart
           </button>
@@ -140,7 +180,9 @@
       ↑
     </button>
   </div>
+  </div>
 </template>
+
 
 
 <script>
@@ -149,13 +191,16 @@ import { useProductStore } from '../stores/products';
 import { useCartStore } from '../stores/cart';
 import { useRoute, useRouter } from 'vue-router';
 import { useReviewStore } from '@/stores/reviewStore';
-import SidePanel from '../components/SidePanel.vue';
+import SidePanel from '@/components/ProductList_components/SidePanel.vue';
 import Fuse from 'fuse.js';
+import ReviewBox from '@/components/ProductList_components/ReviewBox.vue';
+import { useFilterStore } from '@/stores/useFilterStore';
 
 export default {
   name: 'ProductList',
   components: {
     SidePanel,
+    ReviewBox,
   },
   props: {
     searchQuery: {
@@ -169,18 +214,21 @@ export default {
     const reviewStore = useReviewStore();
     const route = useRoute();
     const router = useRouter();
+    const filterStore = useFilterStore();
+    // const topProducts = computed(() => productStore.topProducts);
+    const topProducts = computed(() => productStore.topProducts); // Replace the existing topProducts ref
+
 
     // Reactive variables
     const hoveredProductId = ref(null);
-    const selectedRatings = ref([]);
-    const minPrice = ref(0);
-    const maxPrice = ref(5000);
-    const selectedCategories = ref([]);
     const currentPage = ref(1);
     const pageSize = ref(15);
     const isUpdatingURL = ref(false);
-    const previousSearchQuery = ref(props.searchQuery); // Add this line
-    const showBackToTop = ref(false); // For the "Back to Top" button
+    const previousSearchQuery = ref(props.searchQuery);
+    const showBackToTop = ref(false);
+    const loading = ref(false);
+    const error = ref(null);
+    // const topProducts = ref([]); // Initialize with an empty array
 
     // Categories data
     const categories = ref([
@@ -239,211 +287,216 @@ export default {
       earphone: ['earbuds', 'bluetooth headphones', 'noise cancelling headphones'],
       earbuds: ['bluetooth headphones', 'noise cancelling headphones'],
       blender: ['nutribullet', 'vitamix', 'smoothie maker'],
+      nike: ['jordan', 'shoes', 'air', 'retro'],
+      mac: [ 'apple','macbook air','laptop', ]
     };
 
-    // Function to convert plural terms to singular
+    // Utility functions
     const pluralToSingular = (term) => {
-      if (term.endsWith('es')) {
-        return term.slice(0, -2); // Remove 'es' (e.g., "watches" → "watch")
-      }
-      if (term.endsWith('s')) {
-        return term.slice(0, -1); // Remove 's' (e.g., "laptops" → "laptop")
-      }
-      return term; // Return the term as-is if it doesn't end with 's' or 'es'
+      if (term.endsWith('es')) return term.slice(0, -2);
+      if (term.endsWith('s')) return term.slice(0, -1);
+      return term;
     };
 
-    // Function to recursively expand synonyms
     const expandQueryWithSynonyms = (query) => {
       const normalizedQuery = query.toLowerCase();
-      const synonymsList = new Set(); // Use a Set to avoid duplicates
+      const synonymsList = new Set();
 
-      // Recursive function to add synonyms
       const addSynonyms = (term) => {
         if (!synonymsList.has(term)) {
           synonymsList.add(term);
-
-          // Add the singular form of the term (if applicable)
           const singularTerm = pluralToSingular(term);
-          if (singularTerm !== term) {
-            synonymsList.add(singularTerm);
-          }
+          if (singularTerm !== term) synonymsList.add(singularTerm);
 
-          // Add synonyms for the term
           if (synonyms[term]) {
-            synonyms[term].forEach(synonym => {
-              addSynonyms(synonym); // Recursively add synonyms of synonyms
-            });
+            synonyms[term].forEach(synonym => addSynonyms(synonym));
           }
 
-          // Add synonyms for the singular form of the term (if applicable)
           if (singularTerm !== term && synonyms[singularTerm]) {
-            synonyms[singularTerm].forEach(synonym => {
-              addSynonyms(synonym); // Recursively add synonyms of the singular term
-            });
+            synonyms[singularTerm].forEach(synonym => addSynonyms(synonym));
           }
         }
       };
 
-      // Start with the original query
       addSynonyms(normalizedQuery);
-
-      return Array.from(synonymsList); // Convert the Set back to an array
+      return Array.from(synonymsList);
     };
 
-    // Save state to sessionStorage
-    const saveStateToSessionStorage = () => {
-      const state = {
-        currentPage: currentPage.value,
-        selectedRatings: selectedRatings.value,
-        minPrice: minPrice.value,
-        maxPrice: maxPrice.value,
-        selectedCategories: selectedCategories.value,
-        searchQuery: props.searchQuery, // Add this line
-      };
-      sessionStorage.setItem('productListState', JSON.stringify(state));
-    };
-
-    const loadStateFromSessionStorage = () => {
-      const savedState = JSON.parse(sessionStorage.getItem('productListState'));
-      if (savedState) {
-        currentPage.value = savedState.currentPage || 1;
-        selectedRatings.value = savedState.selectedRatings || [];
-        minPrice.value = savedState.minPrice || 0;
-        maxPrice.value = savedState.maxPrice || 5000;
-        selectedCategories.value = savedState.selectedCategories || [];
-        previousSearchQuery.value = savedState.searchQuery || ''; // Add this line
-      }
-    };
-
-    // Update URL with current state
-    const updateURL = () => {
-      isUpdatingURL.value = true;
-      const query = {
-        page: currentPage.value,
-        search: props.searchQuery || undefined, // Add this line
-        rating: selectedRatings.value.length > 0 ? selectedRatings.value[0] : undefined,
-        minPrice: minPrice.value,
-        maxPrice: maxPrice.value,
-        categories: selectedCategories.value.length > 0 ? selectedCategories.value.join(',') : undefined,
-      };
-
-      // Remove undefined values from the query
-      const filteredQuery = Object.fromEntries(
-        Object.entries(query).filter(([_, value]) => value !== undefined)
-      );
-
-      router.replace({ query: filteredQuery });
-      isUpdatingURL.value = false;
-    };
-
-    // Load state on mount
-    onMounted(() => {
-      loadStateFromSessionStorage();
-
-      // Load state from URL query parameters
-      const query = route.query;
-      if (query.page) currentPage.value = parseInt(query.page);
-      if (query.rating) selectedRatings.value = [parseInt(query.rating)];
-      if (query.minPrice) minPrice.value = parseFloat(query.minPrice);
-      if (query.maxPrice) maxPrice.value = parseFloat(query.maxPrice);
-      if (query.categories) selectedCategories.value = query.categories.split(',');
-
-      // Fetch products
-      productStore.fetchProducts();
-    });
-
-    // Watch for changes in route.query and update state
-    watch(
-      () => route.query,
-      (newQuery) => {
-        if (isUpdatingURL.value) return; // Skip if URL is being updated programmatically
-
-        if (newQuery.page) currentPage.value = parseInt(newQuery.page);
-        if (newQuery.rating) selectedRatings.value = [parseInt(newQuery.rating)];
-        if (newQuery.minPrice) minPrice.value = parseFloat(newQuery.minPrice);
-        if (newQuery.maxPrice) maxPrice.value = parseFloat(newQuery.maxPrice);
-        if (newQuery.categories) selectedCategories.value = newQuery.categories.split(',');
-      },
-      { immediate: true }
-    );
-
-    watch(() => props.searchQuery, async (newQuery, oldQuery) => {
-      if (newQuery === oldQuery) return; // Skip if search query hasn't changed
-
-      if (newQuery) {
-        await productStore.fetchProducts({ search: newQuery });
-      } else {
-        await productStore.fetchProducts(); // Fetch all products if query is empty
-      }
-
-      // Reset to page 1 only if the search query has changed
-      if (newQuery !== previousSearchQuery.value) {
-        currentPage.value = 1; // Reset to first page on new search
-      }
-
-      previousSearchQuery.value = newQuery; // Update the previous search query
-      updateURL(); // Update URL with new search query
-    }, { immediate: true });
-
-    // Watch for changes in filters or page and save to sessionStorage
-    watch([currentPage, selectedRatings, minPrice, maxPrice, selectedCategories], () => {
-      saveStateToSessionStorage();
-      updateURL();
-    });
-
-    // Function to calculate relevance score for a product
     const calculateRelevanceScore = (product, query) => {
       const normalizedQuery = query.toLowerCase();
       const normalizedName = product.name.toLowerCase();
       const normalizedDescription = product.description.toLowerCase();
 
-      // Exact match in name or description (highest score)
-      if (normalizedName.includes(normalizedQuery) || normalizedDescription.includes(normalizedQuery)) {
-        return 3;
-      }
+      if (normalizedName.includes(normalizedQuery) || normalizedDescription.includes(normalizedQuery)) return 3;
 
-      // Check for synonyms in name or description (medium score)
       const synonymsForQuery = synonyms[normalizedQuery] || [];
       const hasSynonymMatch = synonymsForQuery.some(synonym => {
         return normalizedName.includes(synonym) || normalizedDescription.includes(synonym);
       });
 
-      if (hasSynonymMatch) {
-        return 2;
-      }
-
-      // Partial match in name or description (lower score)
-      if (
-        normalizedName.includes(normalizedQuery) ||
-        normalizedDescription.includes(normalizedQuery)
-      ) {
-        return 1;
-      }
-
-      // No match
+      if (hasSynonymMatch) return 2;
+      if (normalizedName.includes(normalizedQuery) || normalizedDescription.includes(normalizedQuery)) return 1;
       return 0;
     };
 
-    // Computed property to rank products based on search query
+    // URL and state management
+    
+
+    const updateURL = () => {
+      isUpdatingURL.value = true;
+      const query = {
+        page: currentPage.value,
+        search: props.searchQuery || undefined,
+        rating: filterStore.filters.rating[0] || undefined,
+        minPrice: filterStore.filters.minPrice,
+        maxPrice: filterStore.filters.maxPrice,
+        categories: filterStore.filters.categories?.join(',') || undefined, // Optional chaining
+        // discountCategories: filterStore.filters.discountCategories?.join(',') || undefined,
+        discountRanges: filterStore.filters.discountRanges?.length 
+          ? JSON.stringify(filterStore.filters.discountRanges)
+          : undefined,
+      };
+
+      router.replace({ query: Object.fromEntries(Object.entries(query).filter(([_, v]) => v !== undefined)) });
+      isUpdatingURL.value = false;
+    };
+
+
+//     const isBestSeller = (product) => {
+//   return topProducts.value.some(p => p.id === product.id);
+// };
+    const isBestSeller = (product) => {
+      return (topProducts.value || []).some(p => p.id === product.id);
+    };
+
+    // Initialization
+    
+    onMounted(async () => {
+  try {
+    loading.value = true;
+
+    // Fetch top products if not already fetched
+    if (productStore.topProducts.length === 0) {
+      await productStore.fetchTopProducts();
+    }
+    // topProducts.value = productStore.topProducts; // Populate topProducts ref
+    const topProducts = computed(() => productStore.topProducts || []); // Add fallback
+
+    // Load from session storage first
+    filterStore.loadFiltersFromSessionStorage();
+
+    // Override with URL parameters
+    const query = route.query;
+    currentPage.value = query.page ? parseInt(query.page, 10) : 1;
+
+    // Parse discountRanges from URL
+    const discountRanges = query.discountRanges 
+      ? JSON.parse(query.discountRanges)
+      : [];
+
+    filterStore.setFilters({
+      rating: query.rating ? [Number(query.rating)] : [],
+      minPrice: query.minPrice ? Number(query.minPrice) : 0,
+      maxPrice: query.maxPrice ? Number(query.maxPrice) : 5000,
+      categories: query.categories ? query.categories.split(',') : [],
+      // discountCategories: query.discountCategories ? query.discountCategories.split(',') : [],
+      discountRanges: discountRanges,
+
+    });
+
+    await productStore.setFilters(filterStore.filters);
+  } catch (err) {
+    error.value = err;
+    console.error("Error initializing products:", err);
+  } finally {
+    loading.value = false;
+  }
+});
+    // Watchers
+
+    // ProductList.vue setup function
+watch(
+  () => filterStore.filters,
+  (newFilters) => {
+    productStore.setFilters(newFilters); // This updates productStore's filters and fetches products
+    updateURL();
+  },
+  { deep: true }
+);
+
+    watch(
+    () => filterStore.filters,
+    () => {
+      productStore.fetchProducts({
+        search: filterStore.searchQuery,
+        filters: filterStore.filters,
+      });
+      updateURL(); // Update URL when filters change
+    },
+    { deep: true }
+  );
+    watch(
+      () => props.searchQuery,
+      async (newQuery, oldQuery) => {
+        if (newQuery === oldQuery) return;
+
+        try {
+          loading.value = true;
+          if (newQuery) {
+            await productStore.fetchProducts({ search: newQuery });
+          } else {
+            await productStore.fetchProducts();
+          }
+
+          if (newQuery !== previousSearchQuery.value) {
+            currentPage.value = 1;
+          }
+
+          previousSearchQuery.value = newQuery;
+          updateURL();
+        } catch (err) {
+          error.value = err;
+        } finally {
+          loading.value = false;
+        }
+      },
+      { immediate: true }
+    );
+
+
+    watch(
+    () => route.query.search,
+    (newSearch) => {
+      if (newSearch) {
+        filterStore.searchQuery = newSearch; // Update store
+        productStore.fetchProducts({ search: newSearch });
+      } else {
+        filterStore.searchQuery = ''; // Clear search query in store
+        productStore.fetchProducts(); // Fetch all products
+      }
+    },
+    { immediate: true }
+  );
+
+  // Add watcher for currentPage to update URL
+watch(currentPage, () => {
+  updateURL();
+});
+
+    // Product filtering and pagination
     const filteredProducts = computed(() => {
       let products = productStore.products;
 
-      // Apply search query and synonyms
+      // Search logic
       if (props.searchQuery) {
-        // Expand the search query with synonyms
         const expandedQuery = expandQueryWithSynonyms(props.searchQuery);
-
-        // Use Fuse.js for fuzzy search
         const fuse = new Fuse(products, {
-          keys: ['name', 'description'], // Search in name and description
-          threshold: 0.5, // Adjust threshold for typo tolerance
+          keys: ['name', 'description'],
+          threshold: 0.5,
           includeScore: true,
         });
 
-        // Perform fuzzy search for each term in the expanded query
         const fuzzyResults = expandedQuery.flatMap(term => fuse.search(term));
-
-        // Use a Map to deduplicate products based on their IDs
         const uniqueProducts = new Map();
 
         fuzzyResults.forEach(result => {
@@ -457,52 +510,58 @@ export default {
           }
         });
 
-        // Convert the Map back to an array and sort by relevance score
         products = Array.from(uniqueProducts.values())
           .sort((a, b) => {
-            if (b.relevanceScore !== a.relevanceScore) {
-              return b.relevanceScore - a.relevanceScore; // Sort by relevance score
-            }
-            return a.fuseScore - b.fuseScore; // Sort by Fuse.js score if relevance is equal
+            if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore;
+            return a.fuseScore - b.fuseScore;
           })
           .map(product => ({
             ...product,
-            relevanceScore: undefined, // Remove relevance score from final output
-            fuseScore: undefined, // Remove Fuse.js score from final output
+            relevanceScore: undefined,
+            fuseScore: undefined,
           }));
       }
 
-      // Apply filters (rating, price, and category)
+      // // Apply filters
+      
       return products.filter(product => {
-        const matchesRating = selectedRatings.value.length === 0 || selectedRatings.value.some(rating => product.avgRating >= rating);
-        const matchesPrice = product.price >= minPrice.value && product.price <= maxPrice.value;
+        // Rating filter
+        const matchesRating = filterStore.filters.rating.length === 0 || 
+                              product.avgRating >= filterStore.filters.rating[0];
 
-        // Category filtering logic
-        const matchesCategory = selectedCategories.value.length === 0 || 
-          selectedCategories.value.some(selectedCategory => {
-            // Check if the product belongs to the selected category or its subcategories
+        // Price filter
+        // const matchesPrice = product.price >= Number(filterStore.filters.minPrice) &&
+        //                     product.price <= Number(filterStore.filters.maxPrice);
+        const finalPrice = product.discountPercentage 
+          ? product.price * (1 - product.discountPercentage / 100)
+          : product.price;
+          
+        const matchesPrice = finalPrice >= filterStore.filters.minPrice &&
+                            finalPrice <= filterStore.filters.maxPrice;
+
+        // Category filter
+        const matchesCategory = filterStore.filters.categories.length === 0 || 
+          filterStore.filters.categories.some(selectedCategory => {
             return product.categories?.some(category => {
-              // Check if the category name matches the selected category
-              if (category.name === selectedCategory) {
-                return true;
-              }
-              // Check if the category belongs to any of the subcategories
-              const parentCategory = categories.value.find(cat => cat.children?.includes(category.name));
-              if (parentCategory && parentCategory.name === selectedCategory) {
-                return true;
-              }
-              return false;
+              if (category.name === selectedCategory) return true;
+              const parentCategory = categories.value.find(cat => 
+                cat.children?.includes(category.name)
+              );
+              return parentCategory?.name === selectedCategory;
             });
           });
+        
+        // Discount Range Filter
+        // const matchesDiscount = filterStore.filters.discountRanges.length === 0 || filterStore.filters.discountRanges.some(range => {
+        //   return product.discountPercentage >= range.min && product.discountPercentage <= range.max;
+        // });
 
-        return matchesRating && matchesPrice && matchesCategory;
+        return matchesRating && matchesPrice && matchesCategory ;
       });
+   
     });
 
-    // Pagination logic
-    const totalPages = computed(() => {
-      return Math.ceil(filteredProducts.value.length / pageSize.value);
-    });
+    const totalPages = computed(() => Math.ceil(filteredProducts.value.length / pageSize.value));
 
     const paginatedProducts = computed(() => {
       const startIndex = (currentPage.value - 1) * pageSize.value;
@@ -511,55 +570,38 @@ export default {
     });
 
     const nextPage = () => {
-      if (currentPage.value < totalPages.value) {
-        currentPage.value++;
-      }
+      if (currentPage.value < totalPages.value) currentPage.value++;
     };
 
     const prevPage = () => {
-      if (currentPage.value > 1) {
-        currentPage.value--;
-      }
+      if (currentPage.value > 1) currentPage.value--;
     };
 
-    // Apply filters (rating, minPrice, maxPrice, and categories)
     const applyFilters = (filters) => {
-      selectedRatings.value = filters.rating ? [filters.rating] : [];
-      minPrice.value = filters.minPrice || 0;
-      maxPrice.value = filters.maxPrice || 5000;
-
-      // Handle "Kitchen Appliances" and its subcategories
-      const kitchenAppliancesCategory = categories.value.find(cat => cat.name === 'Kitchen Appliances');
-      if (kitchenAppliancesCategory && filters.categories?.includes('Kitchen Appliances')) {
-        selectedCategories.value = [
-          ...filters.categories,
-          ...(kitchenAppliancesCategory.subChildren?.['Kitchen Appliances'] || [])
-        ];
-      } else {
-        selectedCategories.value = filters.categories || [];
-      }
-
-      // Only reset currentPage if explicitly required
-      if (filters.resetPage) {
-        currentPage.value = 1;
-      }
+      filterStore.setFilters(filters);
+      currentPage.value = 1;
+      updateURL();
     };
 
-    // Clear filters
     const clearFilters = () => {
-      selectedRatings.value = [];
-      minPrice.value = 0;
-      maxPrice.value = 5000;
-      selectedCategories.value = [];
-      currentPage.value = 1; // Reset to first page when filters are cleared
+  filterStore.resetFilters();
+  currentPage.value = 1;
+  updateURL(); // Add this to clear URL parameters
+};
+
+    // UI methods
+    const showReviewBox = (productId) => {
+      hoveredProductId.value = productId;
     };
 
-    const showRatingDistribution = (product) => {
-      hoveredProductId.value = product.id;
+    const keepReviewBoxVisible = (productId) => {
+      hoveredProductId.value = productId;
     };
 
-    const hideRatingDistribution = () => {
-      hoveredProductId.value = null;
+    const hideReviewBox = () => {
+      setTimeout(() => {
+        hoveredProductId.value = null;
+      });
     };
 
     const redirectToReviews = (productId) => {
@@ -580,14 +622,12 @@ export default {
       cartStore.addToCart(product);
     };
 
-    // Computed property to generate visible page numbers
     const visiblePages = computed(() => {
       const pages = [];
-      const maxVisiblePages = 5; // Number of visible page buttons
+      const maxVisiblePages = 5;
       let startPage = Math.max(1, currentPage.value - Math.floor(maxVisiblePages / 2));
       let endPage = Math.min(totalPages.value, startPage + maxVisiblePages - 1);
 
-      // Adjust startPage if endPage exceeds totalPages
       if (endPage - startPage + 1 < maxVisiblePages) {
         startPage = Math.max(1, endPage - maxVisiblePages + 1);
       }
@@ -599,19 +639,16 @@ export default {
       return pages;
     });
 
-    // Function to navigate to a specific page
     const goToPage = (page) => {
       if (page >= 1 && page <= totalPages.value) {
         currentPage.value = page;
       }
     };
 
-    // Handle scroll event for "Back to Top" button
     const handleScroll = () => {
-      showBackToTop.value = window.scrollY > 100; // Show button after scrolling 100px
+      showBackToTop.value = window.scrollY > 100;
     };
 
-    // Smooth scroll to top
     const scrollToTop = () => {
       window.scrollTo({
         top: 0,
@@ -619,32 +656,30 @@ export default {
       });
     };
 
-    // Add scroll event listener when the component mounts
+    
+
+    // Scroll event listeners
     onMounted(() => {
       window.addEventListener('scroll', handleScroll);
     });
 
-    // Clean up the scroll event listener when the component unmounts
     onUnmounted(() => {
       window.removeEventListener('scroll', handleScroll);
     });
 
     return {
       hoveredProductId,
-      selectedRatings,
-      minPrice,
-      maxPrice,
-      selectedCategories,
       categories,
       currentPage,
       totalPages,
       visiblePages,
       filteredProducts,
       paginatedProducts,
-      loading: computed(() => productStore.isLoading),
-      error: computed(() => productStore.getError),
-      showRatingDistribution,
-      hideRatingDistribution,
+      loading: computed(() => productStore.isLoading || loading.value),
+      error,
+      showReviewBox,
+      keepReviewBoxVisible,
+      hideReviewBox,
       redirectToReviews,
       calculateDeliveryDate,
       addToCart,
@@ -655,31 +690,73 @@ export default {
       goToPage,
       showBackToTop,
       scrollToTop,
+      filterStore, // Ensure filterStore is exposed to the template
+      isBestSeller,
     };
   },
 };
 </script>
 
 <style scoped>
-.products-container {
+
+.products-container-wrapper{
+  padding-left: clamp(20px, 5vw, 50px); /* Adjust values as needed */
+  padding-right: clamp(20px, 5vw, 50px); /* Adjust values as needed */
+  margin: 0; /* Important: Remove default body margins */
+}
+/* .products-container {
   display: flex;
   max-width: 1450px;
   margin: 0 auto;
   padding: 10px;
   gap: 10px;
   margin-left: 40px;
-  /* align-items: center; */
-  /* justify-content: center; */
+  
   background: #f9f9f9;
-  /* background: #f9f9f9; */
+ 
+} */
+/* .products-container {
+  display: flex;
+  max-width: 100%;
+  margin:  auto;
+  padding: 0.625rem;
+  gap: 0.625rem;
+  margin-left: clamp(1rem, 2.5vw, 2.5rem); 
+  background: #f9f9f9;
+} */
+.products-container {
+  display: flex;
+  max-width: 1400px; /* Or a specific max-width */
+  margin-left: 0 auto; /* Centers the container */
+  padding: 0.625rem;
+  gap: 0.625rem;
+  background: #f9f9f9;
+  justify-content: center; /* Centers the items *within* the container */
 }
 
-.products-list {
+.side-panel {
+  flex-shrink: 0; /* Prevent side panel from shrinking */
+  flex-basis: 27%; /* Initial width: 30% */
+  /* width: clamp(250px, 20vw, 350px);  */
+  transition: all 0.3s ease;
+}
+
+/* .products-list {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 10px;
+} */
+.products-list {
+  flex: 1;
+  flex-basis: 73%; /* Initial width: 70% */
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  min-width: 0; /* Prevent flex item overflow */
 }
+
 
 .product-count-box {
   padding: 10px;
@@ -699,10 +776,21 @@ export default {
   overflow: hidden;
   background: white;
   transition: transform 0.2s, box-shadow 0.2s;
-  height: 290px; /* Set height */
-  width: 952px;
+  height: 290px;
+  width: 100%;
   
 }
+/* .product-card {
+  display: flex;
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: white;
+  transition: transform 0.2s, box-shadow 0.2s;
+  height: clamp(200px, 30vh, 290px); 
+  width: 100%;
+  min-width: 0; 
+} */
 
 .product-card:hover {
   transform: translateY(-2px);
@@ -717,12 +805,21 @@ export default {
   justify-content: center;
   margin-top: auto;
   margin-bottom: auto;
-  width: 220px; /* Fixed width for the container */
-  height: 220px; /* Fixed height for the container */
-  overflow: hidden; /* Ensure the image doesn't overflow */
-  /* border: 1px solid #ddd; Optional: Add a border for better visualization */
-  /* background: #f30b0b; Optional: Add a background color */
+  width: 220px; 
+  height: 220px; 
+  overflow: hidden;
 }
+/* .product-image-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  width: clamp(150px, 20%, 220px); 
+  height: clamp(150px, 90%, 220px); 
+  overflow: hidden;
+  flex-shrink: 0; 
+} */
+
 
 .product-image {
   max-width: 100%; /* Ensure the image doesn't exceed the container width */
@@ -734,6 +831,16 @@ export default {
   padding: 10px;
   flex: 1;
 }
+/* .product-info {
+  padding: clamp(0.5rem, 1vw, 1rem);
+  padding: 10px;
+
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+} */
 
 .product-name {
   font-size: 18px;
@@ -747,6 +854,22 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* .product-name { */
+  /* font-size: clamp(0.875rem, 1.5vw, 1.125rem); */
+  /* margin-bottom: 0.5rem; */
+  /* margin-top: 0.5rem; */
+  /* font-size: 18px;
+  color: #333;
+  text-decoration: none;
+  margin-bottom: 8px;
+  margin-top: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis; */
+/* } */
+
 
 .product-name:hover {
   color: #3498db;
@@ -755,6 +878,10 @@ export default {
 .star-rating-container {
   position: relative;
   display: inline-block;
+  align-items: center;
+  gap: 8px; 
+  padding: 8px; /* Increase hover area */
+  font-size: clamp(0.75rem, 1vw, 0.875rem);
 }
 
 .star-rating {
@@ -809,6 +936,8 @@ export default {
   padding: 8px;
   z-index: 10;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 200px;
+
 }
 
 .rating-bar {
@@ -936,6 +1065,14 @@ export default {
 .back-to-top:hover {
   background-color: #2563eb; /* Blue 600 */
   transform: translateY(-2px); /* Slight lift on hover */
+}
+
+.review-box {
+  width: 400px; /* Adjust as needed */
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 @media (max-width: 768px) {
