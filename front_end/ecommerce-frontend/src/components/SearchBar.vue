@@ -65,7 +65,7 @@
 
 <script>
 import { ref, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useProductStore } from '../stores/products';
 import Fuse from 'fuse.js'; // Import Fuse.js for fuzzy search
 import debounce from 'lodash/debounce';
@@ -74,6 +74,7 @@ export default {
   name: 'SearchBar',
   setup() {
     const router = useRouter();
+    const route = useRoute();
     const productStore = useProductStore();
 
     const searchQuery = ref('');
@@ -167,6 +168,15 @@ export default {
       }, 200);
     };
 
+    // Watch the route to update search query based on the current route's query parameters
+    watch(() => route.query.search, (newSearch) => {
+      if (newSearch) {
+        searchQuery.value = newSearch;
+      } else {
+        searchQuery.value = '';
+      }
+    });
+
     // Load recent searches on mount
     onMounted(() => {
       loadRecentSearches();
@@ -194,7 +204,7 @@ export default {
 .search-container {
   position: relative;
   width: 100%;
-  max-width: 500px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -223,19 +233,20 @@ export default {
 
 .search-input-wrapper input {
   flex: 1;
-  padding: 12px 16px;
+  padding: 8px 16px;
   border: none;
   outline: none;
   font-size: 16px;
 }
 
 .search-button {
-  padding: 12px 20px;
+  padding: 8px 15px;
   background: rgb(138, 113, 72);
   border: none;
   color: white;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  min-width: 45px;
 }
 
 .search-button:hover {

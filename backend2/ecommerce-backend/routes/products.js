@@ -7,6 +7,10 @@ const {authenticateToken, isAdmin} = require('../middleware/authMiddleware');
 const reviewRoutes = require('./reviews');
 
 // Public routes
+
+// Public routes should come first 
+router.get('/latest', productController.getLatestProducts); // Add this line
+router.get('/top/products', productController.getTopProducts); // Keep this line
 router.get('/', productController.getAllProducts);
 router.get('/search', productController.searchProducts);
 router.get('/:id', productController.getProductById);

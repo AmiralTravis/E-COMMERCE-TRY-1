@@ -1,12 +1,9 @@
 // ecommerce-backend/routes/auth.js
-
 const express = require('express');
 const router = express.Router();
 const User = require('../models/usersModels');
-const userController = require('../controllers/userController'); // Import userController
-const argon2 = require('argon2');
-const jwt = require('jsonwebtoken');
-const {authenticateToken} = require('../middleware/authMiddleware'); // Import middleware
+const userController = require('../controllers/userController');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
@@ -20,6 +17,15 @@ router.post('/register', userController.registerUser);
 
 // Login route
 router.post('/login', userController.loginUser);
+
+// Forgot password route
+router.post('/forgot-password', userController.forgotPassword);
+
+// Reset password route
+router.post('/reset-password', userController.resetPassword);
+
+// Change password route (requires authentication)
+router.post('/change-password', authenticateToken, userController.changePassword);
 
 // Refresh token route
 router.post('/refresh', authenticateToken, async (req, res) => {
@@ -68,8 +74,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
 // Verify token route
 router.get('/verify', authenticateToken, (req, res) => {
-  // User information is already attached to req.user by the middleware
-  res.json({ user: req.user }); // Successfully verified user
+  res.json({ user: req.user });
 });
 
 // Logout route

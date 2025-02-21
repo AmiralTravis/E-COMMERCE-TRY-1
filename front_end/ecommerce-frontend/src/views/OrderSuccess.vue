@@ -8,12 +8,30 @@
     </div>
   </template>
   
-  <script>
+  <!-- <script>
+
+  
   export default {
     name: 'OrderSuccess',
   };
-  </script>
+  </script> -->
   
+  <script>
+import { onMounted } from 'vue';
+
+export default {
+  name: 'OrderSuccess',
+  setup() {
+    onMounted(() => {
+      sessionStorage.removeItem('selectedAddress');
+    });
+
+    return {}; // You can return any data needed in the template from setup()
+  },
+};
+</script>
+
+
   <style scoped>
   /* Add any styles for the OrderSuccess page here */
   </style>

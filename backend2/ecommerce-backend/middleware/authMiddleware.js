@@ -7,15 +7,28 @@ const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET;
 
 // Define public paths that don't require authentication
 
+// const publicPaths = [
+//   '/auth/login',
+//   '/auth/register',
+//   '/auth/refresh',
+//   '/products',
+//   '/categories',
+//   '/products/:id',
+//   '/products/:productId/reviews',
+//   '/reviews/:productId' // Add this line
+// ];
+// authMiddleware.js
 const publicPaths = [
   '/auth/login',
   '/auth/register',
   '/auth/refresh',
   '/products',
   '/categories',
+  '/products/top/products', // Add this line
   '/products/:id',
   '/products/:productId/reviews',
-  '/reviews/:productId' // Add this line
+  '/reviews/top-reviews/:productId',
+  '/reviews/:productId'
 ];
 
 const authenticateToken = (req, res, next) => {
@@ -25,8 +38,17 @@ const authenticateToken = (req, res, next) => {
   console.log('Headers:', req.headers);
 
   // Skip authentication for public paths and OPTIONS requests
+  // const isPublicPath = publicPaths.some(path => {
+  //   const regex = new RegExp(`^${path.replace(/:\w+/g, '[^/]+')}$`);
+  //   return regex.test(req.path);
+  // });
   const isPublicPath = publicPaths.some(path => {
-    const regex = new RegExp(`^${path.replace(/:\w+/g, '[^/]+')}$`);
+    const regexPattern = path
+      .replace(/:\w+/g, '[^/]+') // Replace params with wildcard
+      .replace(/\//g, '\\/') + // Escape slashes
+      (path.endsWith('/') ? '?' : '/?$'); // Allow trailing slash
+    
+    const regex = new RegExp(`^${regexPattern}`);
     return regex.test(req.path);
   });
 

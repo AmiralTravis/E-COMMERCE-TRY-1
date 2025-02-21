@@ -6,6 +6,10 @@ const db = require('../models'); // Import the db object from models/index.js
 const User = db.User; // Get the User model from the db object
 const { Sequelize, DataTypes, Op } = db.Sequelize; // Sequelize operators for conditions
 require('dotenv').config(); // Ensure environment variables are loaded
+const { generateAvatar } = require('../utils/avatarGenerator');
+const crypto = require('crypto');
+const { sendPasswordResetEmail } = require('../utils/emailService');
+
 
 // JWT secrets and expiry settings
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -54,95 +58,100 @@ exports.getUserById = async (req, res) => {
 };
 
 // Register a new user
+
 exports.registerUser = async (req, res) => {
   const { username, email, password } = req.body;
 
   try {
-    // Check if username or email already exists
-    const existingUser = await User.findOne({
-      where: {
-        [Op.or]: [{ username }, { email }]
+      // Check if username or email already exists
+      const existingUser = await User.findOne({
+          where: {
+              [Op.or]: [{ username }, { email }]
+          }
+      });
+
+      if (existingUser) {
+          return res.status(409).json({ error: 'Username or email already exists' });
       }
-    });
 
-    if (existingUser) {
-      return res.status(409).json({ error: 'Username or email already exists' });
-    }
+      // Hash password with Argon2
+      const hashedPassword = await argon2.hash(password, argon2Options);
 
-    // Hash password with Argon2
-    const hashedPassword = await argon2.hash(password, argon2Options);
+      // Create new user WITHOUT the id:
+      const newUser = await User.create({ 
+          username, 
+          email, 
+          password: hashedPassword // No id here!
+      });
 
-    // Create new user with the hashed password
-    const newUser = await User.create({ username, email, password: hashedPassword });
+      // Generate avatar URL using the new user's id and username
+      const profilePicUrl = await generateAvatar(newUser.id, username);
 
-    // Generate tokens
-    const accessToken = jwt.sign(
-      { id: newUser.id, username: newUser.username },
-      JWT_SECRET,
-      { expiresIn: ACCESS_TOKEN_EXPIRY }
-    );
-    const refreshToken = jwt.sign(
-      { id: newUser.id },
-      JWT_REFRESH_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRY }
-    );
+      // Update the user with the generated profile picture URL
+      await newUser.update({ profilePicUrl });
 
-    // Set cookies
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
+      // Generate tokens (no changes needed here)
+      const accessToken = jwt.sign(
+          { id: newUser.id, username: newUser.username },
+          JWT_SECRET,
+          { expiresIn: ACCESS_TOKEN_EXPIRY }
+      );
+      const refreshToken = jwt.sign(
+          { id: newUser.id },
+          JWT_REFRESH_SECRET,
+          { expiresIn: REFRESH_TOKEN_EXPIRY }
+      );
 
-    // Respond with user info and access token
-    res.status(201).json({
-      message: 'Registration successful',
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email
-      },
-      accessToken
-    });
+      // Set cookies (no changes needed here)
+      res.cookie('accessToken', accessToken, { /* ... */ });
+      res.cookie('refreshToken', refreshToken, { /* ... */ });
+
+      // Respond with user info and access token (no changes needed here)
+      res.status(201).json({
+          message: 'Registration successful',
+          user: {
+              id: newUser.id,
+              username: newUser.username,
+              email: newUser.email,
+              profilePicUrl: newUser.profilePicUrl
+          },
+          accessToken
+      });
 
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ error: 'Failed to register user' });
+      console.error('Registration error:', err);
+      res.status(500).json({ error: 'Failed to register user' });
   }
 };
 
 // Login user
+
 exports.loginUser = async (req, res) => {
   const { username, password } = req.body;
 
   try {
     // Input validation
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
+      return res.status(400).json({ error: 'Username/Email and password are required' });
     }
 
-    // Find the user by username, including the role
+    // Find the user by username or email, including the role
     const user = await User.findOne({
-      where: { username },
+      where: {
+        [Op.or]: [{ username }, { email: username }]
+      },
       attributes: ['id', 'username', 'password', 'role'] // Include role here
     });
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid username or password' });
+      return res.status(401).json({ message: 'Invalid username/email or password' });
     }
 
     // Compare provided password with the stored hashed password using Argon2
     const validPassword = await argon2.verify(user.password, password);
 
     if (!validPassword) {
-      return res.status(401).json({ message: 'Invalid username or password' });
+      return res.status(401).json({ message: 'Invalid username/email or password' });
     }
 
     // Generate tokens
@@ -177,9 +186,9 @@ exports.loginUser = async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        role: user.role // Include role in response
-      },
-      accessToken
+        role: user.role,
+        hasAddresses: user.addresses && user.addresses.length > 0
+      }
     });
 
   } catch (err) {
@@ -189,25 +198,36 @@ exports.loginUser = async (req, res) => {
 };
 
 
+// // Update user details
 
-// Update user details
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { username, email } = req.body;
-  try {
-    const [updated] = await User.update({ username, email }, {
-      where: { id },
-      returning: true // For PostgreSQL
-    });
+  const { username, email } = req.body; // Include username in the request body
 
-    if (updated) {
-      const updatedUser = await User.findByPk(id, {
-        attributes: { exclude: ['password'] } // Exclude password from response
+  try{
+    if (username) {
+      const existingUser = await User.findOne({
+        where: {
+          username,
+          id: {[Op.ne]: id}
+        }
       });
-      return res.json(updatedUser);
+      if (existingUser) return res.status(409).json ({ error: 'Username taken'});
     }
 
-    return res.status(404).json({ error: 'User not found' });
+    const [updated] = await User.update(
+      { username, email },
+      { where: { id } }
+    );
+
+    if(!updated) return res.status(404).json({ error : 'User not found' });
+
+    const updatedUser = await User.findByPk(id, {
+      attributes: {exclude: ['password'] } 
+    });
+
+    res.json(updatedUser);
+    
   } catch (err) {
     console.error('Update error:', err);
     res.status(500).json({ error: 'Failed to update user' });
@@ -230,5 +250,169 @@ exports.deleteUser = async (req, res) => {
   } catch (err) {
     console.error('Delete error:', err);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+};
+
+
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    const resetExpiry = Date.now() + 3600000; // 1 hour
+    
+    await user.update({
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: resetExpiry
+    });
+
+    // Use existing email service
+    await sendPasswordResetEmail(user, resetToken);
+
+    res.json({ message: 'Password reset email sent' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Error processing password reset' });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+  try {
+    const user = await User.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: { [Op.gt]: Date.now() }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired token' });
+    }
+
+    const hashedPassword = await argon2.hash(password, argon2Options);
+    await user.update({
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null
+    });
+
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Error resetting password' });
+  }
+};
+
+
+
+
+
+// exports.changePassword = async (req, res) => {
+//   const { currentPassword, newPassword } = req.body;
+//   try {
+//     // Explicitly include password field
+//     const user = await User.findByPk(req.user.id, {
+//       attributes: ['id', 'password'] // Must explicitly include password
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
+
+//     // Add validation for empty password field
+//     if (!user.password || user.password === '') {
+//       console.error('No password hash found for user:', user.id);
+//       return res.status(500).json({ error: 'Password reset required' });
+//     }
+
+//     const validPassword = await argon2.verify(user.password, currentPassword);
+    
+//     if (!validPassword) {
+//       return res.status(401).json({ error: 'Current password is incorrect' });
+//     }
+
+//     // Validate new password length
+//     if (newPassword.length < 8) {
+//       return res.status(400).json({ error: 'Password must be at least 8 characters' });
+//     }
+
+//     const hashedPassword = await argon2.hash(newPassword, argon2Options);
+//     await user.update({ password: hashedPassword });
+
+//     res.json({ message: 'Password changed successfully' });
+//   } catch (error) {
+//     console.error('Change password error:', error);
+    
+//     // More specific error messages
+//     let errorMessage = 'Error changing password';
+//     if (error.message.includes('pchstr must be a non-empty string')) {
+//       errorMessage = 'Invalid password format - please reset your password';
+//     }
+    
+//     res.status(500).json({ error: errorMessage });
+//   }
+// };
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    // Find the user by ID, explicitly including the password field
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'password'] // Ensure password is included
+    });
+
+    // If user not found, return 404 error
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the user's password hash is missing or invalid
+    if (!user.password || !user.password.startsWith('$argon2')) {
+      console.error('Invalid or missing password hash for user:', user.id);
+      return res.status(400).json({ 
+        error: 'Your account requires a password reset. Please use the "Forgot Password" feature.' 
+      });
+    }
+
+    // Verify the current password
+    const validPassword = await argon2.verify(user.password, currentPassword);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Validate the new password length
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await argon2.hash(newPassword, argon2Options);
+
+    // Update the user's password in the database
+    await user.update({ password: hashedPassword });
+
+    // Return success message
+    res.json({ message: 'Password changed successfully' });
+
+  } catch (error) {
+    console.error('Change password error:', error);
+
+    // Handle specific errors
+    let errorMessage = 'Error changing password';
+    if (error.message.includes('pchstr must be a non-empty string')) {
+      errorMessage = 'Invalid password format - please reset your password';
+    } else if (error.message.includes('Invalid hash')) {
+      errorMessage = 'Your password hash is invalid. Please reset your password.';
+    }
+
+    // Return a 500 error with the appropriate message
+    res.status(500).json({ error: errorMessage });
   }
 };

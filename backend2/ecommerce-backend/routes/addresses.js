@@ -3,11 +3,16 @@
 const express = require('express');
 const router = express.Router();
 const { UserAddress } = require('../models');
+const { verifyAddressOwnership } = require('../middleware/addressMiddleware');
+const addressController = require('../controllers/addressController');
 
 // Save/Update Address
+
+
 // router.post('/save-address', async (req, res) => {
 //   console.log('Starting save-address request:', req.body);
-  
+//   console.log('Request body:', req.body);
+
 //   try {
 //     const { 
 //       userId, 
@@ -20,101 +25,103 @@ const { UserAddress } = require('../models');
 //       state, 
 //       postalCode, 
 //       country, 
-//       isDefault 
+//       isDefault,
+//       id, // <-- Destructure id here so it can be used or ignored.
+//       ...rest // <--- This will capture any extra fields in case there are some.
 //     } = req.body;
 
-//     // Validate required fields
-//     if (!userId || !fullName || !email || !addressLine1 || !city || !state || !postalCode || !country) {
+//     const addressData = { // <--- Create a new object without the id
+//       userId, 
+//       fullName, 
+//       email, 
+//       phoneNumber, 
+//       addressLine1, 
+//       addressLine2, 
+//       city, 
+//       state, 
+//       postalCode, 
+//       country, 
+//       isDefault,
+//       ...rest // <--- Include the rest of the fields.
+//     };
+
+//     // Validate required fields (using addressData now)
+//     if (!addressData.userId || !addressData.fullName || !addressData.email || !addressData.addressLine1 || !addressData.city || !addressData.state || !addressData.postalCode || !addressData.country) {
 //       return res.status(400).json({ 
 //         error: 'Missing required fields',
 //         receivedData: req.body 
 //       });
 //     }
 
-//     // If setting as default address, wrap both operations in a transaction
-//     if (isDefault) {
-//       console.log('Attempting to set new default address for user:', userId);
-      
-//       const transaction = await UserAddress.sequelize.transaction();
-      
-//       try {
-//         // First, unset any existing default addresses
-//         console.log('Unsetting existing default addresses...');
-//         await UserAddress.update(
-//           { isDefault: false }, 
-//           { 
-//             where: { userId },
-//             transaction
-//           }
-//         );
-//         console.log('Successfully unset existing default addresses');
+//     // Add phone validation in route
+//     const phoneRegex = /^[0-9]{6,15}$/;
 
-//         // Then create or update the new address
+//     if (!phoneRegex.test(addressData.phoneNumber)) {
+//       return res.status(400).json({
+//         error: 'Phone number must be 6-15 digits',
+//         field: 'phoneNumber'
+//       });
+//     }
+
+//     if (isDefault) {
+//       const transaction = await UserAddress.sequelize.transaction();
+//       try {
+//         await UserAddress.update(
+//           { isDefault: false },
+//           { where: { userId }, transaction }
+//         );
+
 //         const [address, created] = await UserAddress.findOrCreate({
 //           where: { 
-//             userId, 
-//             addressLine1,
-//             postalCode
+//             userId: addressData.userId, // Use addressData
+//             addressLine1: addressData.addressLine1, // Use addressData
+//             postalCode: addressData.postalCode // Use addressData
 //           },
-//           defaults: {
-//             ...req.body,
-//             isDefault: true
-//           },
+//           defaults: { ...addressData, isDefault: true }, // Use addressData
 //           transaction
 //         });
 
-//         // If address existed but needs updating
 //         if (!created) {
-//           await address.update(req.body, { transaction });
+//           await address.update(addressData, { transaction }); // Use addressData
 //         }
 
 //         await transaction.commit();
-//         console.log('Transaction committed successfully');
-
-//         return res.status(200).json({
-//           message: created ? 'Address created' : 'Address updated',
+//         return res.status(200).json({ 
+//           message: created ? 'Default address created' : 'Default address updated',
 //           address
 //         });
-
 //       } catch (error) {
-//         console.error('Transaction failed:', error);
 //         await transaction.rollback();
-//         throw error;
+//         console.error('Transaction error:', error);
+//         return res.status(500).json({ error: error.message });
 //       }
 //     } else {
-//       // If not setting as default, simply create/update the address
-//       console.log('Creating/updating non-default address');
 //       const [address, created] = await UserAddress.findOrCreate({
 //         where: { 
-//           userId, 
-//           addressLine1,
-//           postalCode
+//           userId: addressData.userId, // Use addressData
+//           addressLine1: addressData.addressLine1, // Use addressData
+//           postalCode: addressData.postalCode // Use addressData
 //         },
-//         defaults: req.body
+//         defaults: addressData // Use addressData
 //       });
 
-//       // If address existed but needs updating
 //       if (!created) {
-//         await address.update(req.body);
+//         await address.update(addressData); // Use addressData
 //       }
 
-//       console.log('Address operation completed successfully');
 //       return res.status(200).json({
 //         message: created ? 'Address created' : 'Address updated',
 //         address
 //       });
 //     }
-
 //   } catch (error) {
 //     console.error('Error in save-address route:', error);
-//     return res.status(500).json({ 
-//       error: error.message,
-//       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-//     });
+//     return res.status(500).json({ error: error.message });
 //   }
 // });
 router.post('/save-address', async (req, res) => {
   console.log('Starting save-address request:', req.body);
+  console.log('Request body:', req.body);
 
   try {
     const { 
@@ -128,40 +135,59 @@ router.post('/save-address', async (req, res) => {
       state, 
       postalCode, 
       country, 
-      isDefault 
+      isDefault,
+      id,
+      countryCode, // Add this line to destructure countryCode
+      ...rest 
     } = req.body;
 
+    const addressData = { 
+      userId, 
+      fullName, 
+      email, 
+      phoneNumber, 
+      addressLine1, 
+      addressLine2, 
+      city, 
+      state, 
+      postalCode, 
+      country,
+      countryCode, // Add this line
+      isDefault,
+      ...rest
+    };
+
     // Validate required fields
-    if (!userId || !fullName || !email || !addressLine1 || !city || !state || !postalCode || !country) {
+    if (!addressData.userId || !addressData.fullName || !addressData.email || 
+        !addressData.addressLine1 || !addressData.city || !addressData.state || 
+        !addressData.postalCode || !addressData.country || !addressData.countryCode) { // Add countryCode validation
       return res.status(400).json({ 
         error: 'Missing required fields',
         receivedData: req.body 
       });
     }
 
-    // Handle setting a new default address
     if (isDefault) {
       const transaction = await UserAddress.sequelize.transaction();
       try {
-        // Unset existing default addresses
         await UserAddress.update(
           { isDefault: false },
           { where: { userId }, transaction }
         );
 
-        // Create or update the new address
         const [address, created] = await UserAddress.findOrCreate({
           where: { 
-            userId, 
-            addressLine1,
-            postalCode
+            userId: addressData.userId,
+            addressLine1: addressData.addressLine1,
+            postalCode: addressData.postalCode,
+            countryCode: addressData.countryCode // Add this line
           },
-          defaults: { ...req.body, isDefault: true },
+          defaults: { ...addressData, isDefault: true },
           transaction
         });
 
         if (!created) {
-          await address.update(req.body, { transaction });
+          await address.update(addressData, { transaction });
         }
 
         await transaction.commit();
@@ -175,18 +201,18 @@ router.post('/save-address', async (req, res) => {
         return res.status(500).json({ error: error.message });
       }
     } else {
-      // Create or update a non-default address
       const [address, created] = await UserAddress.findOrCreate({
         where: { 
-          userId, 
-          addressLine1,
-          postalCode
+          userId: addressData.userId,
+          addressLine1: addressData.addressLine1,
+          postalCode: addressData.postalCode,
+          countryCode: addressData.countryCode // Add this line
         },
-        defaults: req.body
+        defaults: addressData
       });
 
       if (!created) {
-        await address.update(req.body);
+        await address.update(addressData);
       }
 
       return res.status(200).json({
@@ -199,8 +225,6 @@ router.post('/save-address', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
-
-
 
 // Get User Addresses
 router.get('/user-addresses/:userId', async (req, res) => {
@@ -227,5 +251,11 @@ router.get('/user-addresses/:userId', async (req, res) => {
     });
   }
 });
+
+
+// Protected routes
+router.put('/:id', verifyAddressOwnership, addressController.updateAddress);
+router.delete('/:id', verifyAddressOwnership, addressController.deleteAddress);
+router.put('/:id/set-default', verifyAddressOwnership, addressController.setDefaultAddress);
 
 module.exports = router;

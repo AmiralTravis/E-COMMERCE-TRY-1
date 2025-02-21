@@ -6,7 +6,10 @@ import App from './App.vue';
 import router from './router';
 import api from './services/api';
 import { useAuthStore } from './stores/auth';
-import './assets/main.css'; // Import Tailwind styles
+import 'vue-advanced-cropper/dist/style.css';
+// import './main.css'; // Import Tailwind styles
+// import './output.css';
+import './index.css'
 
 
 const app = createApp(App);
