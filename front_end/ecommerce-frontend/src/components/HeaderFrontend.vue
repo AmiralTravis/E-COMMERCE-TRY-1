@@ -1,5 +1,4 @@
 <!-- components/HeaderFrontend.vue -->
-<!-- components/HeaderFrontend.vue -->
 <template>
   <header class="header">
     <nav class="nav">
@@ -10,6 +9,30 @@
       <SearchBar :categories="categories" />
       <div class="nav-links">
         <router-link to="/products" class="products-link" @click.native="resetFilters">Products</router-link>
+        <!-- <router-link 
+          v-if="isAuthenticated && !isSeller"
+          to="/seller-registration"
+          class="seller-link"
+        >
+          Become a Seller
+        </router-link> -->
+        <!-- Seller Links -->
+        <template v-if="isAuthenticated">
+          <router-link 
+            v-if="!isSeller && !isAdmin && !isSuperAdmin"
+            to="/seller-registration"
+            class="seller-link"
+          >
+            Become a Seller
+          </router-link>
+          <router-link 
+            v-else-if="isSeller && !isAdmin && !isSuperAdmin"
+            to="/seller"
+            class="seller-link"
+          >
+            Seller Dashboard
+          </router-link>
+        </template>
         <router-link to="/cart" class="cart-link flex items-center space-x-2 px-4 py-2 rounded-md">
           <div class="relative">
             <span 
@@ -33,7 +56,8 @@
                   <img 
                     :src="profilePicUrl" 
                     alt="User Avatar" 
-                    class="avatar-image"
+                    class="avatar-image cursor-pointer"
+                    @click="toggleAvatarMenu"
                   />
                 </template>
                 <template v-else>
@@ -55,6 +79,19 @@
               </router-link>
               <button @click="handleLogout" class="dropdown-item logout-item">
                 <span class="icon">🚪</span> Logout
+              </button>
+            </div>
+            <!-- Avatar Upload Menu -->
+            <div v-if="showAvatarMenu" class="avatar-upload-menu">
+              <input
+                type="file"
+                ref="avatarInput"
+                accept="image/*"
+                @change="handleAvatarUpload"
+                class="hidden"
+              />
+              <button @click="$refs.avatarInput.click()" class="menu-item">
+                Change Avatar
               </button>
             </div>
           </div>
@@ -129,6 +166,8 @@ export default defineComponent({
 
     const showDropdown = ref(false);
     const showNotifications = ref(false);
+    const showAvatarMenu = ref(false);
+    const avatarInput = ref(null);
     
     const notifications = ref([
       { id: 1, message: 'Your order has been shipped!', time: '2 hours ago', read: false },
@@ -160,6 +199,8 @@ export default defineComponent({
     const isAuthenticated = computed(() => authStore.isAuthenticated);
     const isAdmin = computed(() => authStore.isAdmin);
     const isSuperAdmin = computed(() => authStore.isSuperAdmin);
+    const isSeller = computed(() => authStore.isSeller); // Add this computed property
+
     const cartItemCount = computed(() => cartStore.itemCount);
 
     const userInitials = computed(() => {
@@ -181,6 +222,24 @@ export default defineComponent({
       notifications.value = notifications.value.map(n => ({ ...n, read: true }));
     };
 
+    const toggleAvatarMenu = () => {
+      showAvatarMenu.value = !showAvatarMenu.value;
+    };
+
+    const handleAvatarUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        await authStore.updateAvatar(file);
+        showAvatarMenu.value = false;
+        // Refresh the profile picture URL
+        profilePicUrl.value = `${authStore.user.profilePicUrl}?t=${Date.now()}`;
+      } catch (error) {
+        console.error('Avatar upload failed:', error);
+      }
+    };
+
     const categoryStore = useCategoryStore();
     const categories = computed(() => categoryStore.categories);
 
@@ -194,15 +253,20 @@ export default defineComponent({
       isAuthenticated,
       isAdmin,
       isSuperAdmin,
+      isSeller,
       cartItemCount,
       handleLogout,
       userInitials,
       showDropdown,
       showNotifications,
+      showAvatarMenu,
+      avatarInput,
       notifications,
       unreadNotifications,
       toggleNotifications,
       markAllAsRead,
+      toggleAvatarMenu,
+      handleAvatarUpload,
       categories,
       resetFilters,
       guestAvatar,
@@ -211,7 +275,6 @@ export default defineComponent({
   }
 });
 </script>
-
 <!-- Keep your existing styles -->
 
 <style scoped>
@@ -483,6 +546,7 @@ export default defineComponent({
   text-align: center;
   color: #666;
 }
+
 
 
 @media (max-width: 1024px) {

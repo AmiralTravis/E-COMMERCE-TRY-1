@@ -39,13 +39,31 @@
                  :key="item.id" 
                  class="cart-item"
                  :class="{ 'removing': removingItems.includes(item.id) }">
-              <div class="item-image-container">
+              <!-- <div class="item-image-container">
                 <img :src="`/api/placeholder/200/200`" :alt="item.name" class="item-image" />
-              </div>
-              
+              </div> -->
+              <!-- <div class="item-image-container relative overflow-hidden p-3 rounded-t-xl h-64">
+  <img :src="item.imageUrl" :alt="item.name" class="item-image" />
+  <p v-if="item.imageUrl">Image URL: {{ item.imageUrl }}</p>
+  <p v-else>Image URL: Not Available</p>
+</div> -->
+<div class="item-image-container relative overflow-hidden p-3 rounded-t-xl h-64 group">
+  <img 
+    :src="item.imageUrl" 
+    :alt="item.name" 
+    class="w-full h-full object-contain transform group-hover:scale-105 transition-transform duration-300"
+  />
+  <div class="absolute inset-0 bg-black bg-opacity-10"></div>
+</div>         
               <div class="item-details">
                 <div class="item-info">
-                  <h2>{{ item.name }}</h2>
+                  <!-- <h2>{{ item.name }}</h2> -->
+                  <router-link 
+  :to="`/products/${item.id}`" 
+  class="cart-product-name"
+>
+  {{ item.name }}
+</router-link>
                   <p class="item-price">${{ formatPrice(item.price) }}</p>
                 </div>
   
@@ -169,7 +187,11 @@
         }
       });
   
-      const cartItems = computed(() => cartStore.items || []);
+      // const cartItems = computed(() => cartStore.items || []);
+      const cartItems = computed(() => {
+    console.log('Cart Items:', cartStore.items);
+    return cartStore.items || [];
+  });
       const subtotal = computed(() => 
         cartItems.value.reduce((total, item) => total + (item.price * item.quantity), 0)
       );
@@ -290,7 +312,8 @@ const proceedToCheckout = async () => {
 
   <style scoped>
   .cart-page {
-    max-width: 1200px;
+    max-width: 1300px;
+    background-color: #ffffff;
     margin: 0 auto;
     padding: 2rem;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -404,9 +427,11 @@ const proceedToCheckout = async () => {
   }
   
   .cart-items {
-    background: white;
+    background: rgb(255, 255, 255);
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Bottom and sides shadow */
+    /* 0 -2px 4px rgba(255, 255, 255, 0.2); */
+    border: 1px solid #ddd;
   }
   
   .cart-item {
@@ -414,7 +439,7 @@ const proceedToCheckout = async () => {
     grid-template-columns: 200px 1fr;
     gap: 1.5rem;
     padding: 1.5rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 2px solid #e5e5e5;
     transition: opacity 0.3s, transform 0.3s;
   }
   
@@ -536,14 +561,25 @@ const proceedToCheckout = async () => {
 
   /* ... (previous styles remain the same until cart-summary) ... */
 
+/* .cart-summary {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 2rem;
+  height: fit-content;
+} */
 .cart-summary {
   background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Bottom and sides shadow */
+    /* 0 -2px 4px rgba(255, 255, 255, 0.2); */
+  border: 1px solid #ddd;
   position: sticky;
   top: 2rem;
   height: fit-content;
 }
+
 
 .summary-header {
   padding: 1.5rem;
@@ -652,6 +688,56 @@ const proceedToCheckout = async () => {
 .list-leave-active {
   position: absolute;
 }
+
+.cart-product-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #1a1a1a;
+  text-decoration: none;
+  font-size: 1.25rem;
+  font-weight: 370;
+  margin: 0 0 0.5rem 0;
+  transition: color 0.2s ease;
+}
+
+.cart-product-name:hover {
+  color: #3498db;
+  text-decoration: underline;
+}
+
+
+.item-image-container {
+  position: relative;
+  width: 100%;
+  height: 16rem; /* Equivalent to h-64 in Tailwind */
+  overflow: hidden;
+  border-radius: 0.75rem; /* Equivalent to rounded-t-xl in Tailwind */
+  padding: 0.75rem; /* Equivalent to p-3 in Tailwind */
+  background-color: white; /* Ensure background is white */
+}
+
+.item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Match object-contain in Tailwind */
+  transition: transform 0.3s ease; /* Match transition-transform duration-300 */
+}
+
+.item-image-container:hover .item-image {
+  transform: scale(1.05); /* Match group-hover:scale-105 */
+}
+
+/* Add a subtle overlay for consistency */
+.item-image-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.01); /* Match bg-black bg-opacity-10 */
+}
+
 
 /* Responsive Design */
 @media (max-width: 1024px) {

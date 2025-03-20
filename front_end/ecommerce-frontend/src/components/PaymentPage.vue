@@ -1,60 +1,97 @@
 <!-- /components/PaymentPage.vue -->
 <template>
-  <div class="payment-page">
-    <div class="order-summary">
-      <h2>Order Summary</h2>
-
-      <!-- Cart Items -->
-      <div class="summary-items">
-        <div v-for="item in cartStore.items" :key="item.id" class="summary-item">
-          <span>{{ item.name }} x {{ item.quantity }}</span>
-          <span>${{ (item.price * item.quantity).toFixed(2) }}</span>
-        </div>
+  <div class="max-w-4xl mx-auto py-8 px-4 md:px-8">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-blue-600 to-blue-800 py-4 px-6">
+        <h2 class="text-xl md:text-2xl font-bold text-white">Order Summary</h2>
       </div>
 
-      <!-- Totals -->
-      <div class="summary-totals">
-        <div class="summary-row">
-          <span>Subtotal</span>
-          <span>${{ cartStore.totalPrice.toFixed(2) }}</span>
+      <div class="p-6">
+        <!-- Cart Items -->
+        <div class="space-y-3 mb-6">
+          <div v-for="item in cartStore.items" :key="item.id" 
+               class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+            <div class="flex items-center">
+              <span class="font-medium text-gray-800">{{ item.name }}</span>
+              <span class="ml-2 text-sm text-gray-500">× {{ item.quantity }}</span>
+            </div>
+            <span class="font-semibold text-gray-900">${{ (item.price * item.quantity).toFixed(2) }}</span>
+          </div>
         </div>
-        <div class="summary-row">
-          <span>Shipping</span>
-          <span>${{ shipping.toFixed(2) }}</span>
+
+        <!-- Totals -->
+        <div class="space-y-2 mb-6 bg-gray-50 p-4 rounded-lg">
+          <div class="flex justify-between text-gray-600">
+            <span>Subtotal</span>
+            <span>${{ cartStore.totalPrice.toFixed(2) }}</span>
+          </div>
+          <div class="flex justify-between text-gray-600">
+            <span>Shipping</span>
+            <span>${{ shipping.toFixed(2) }}</span>
+          </div>
+          <div class="flex justify-between text-gray-600">
+            <span>Tax</span>
+            <span>${{ tax.toFixed(2) }}</span>
+          </div>
+          <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 mt-2">
+            <span>Total</span>
+            <span class="text-blue-700">${{ total.toFixed(2) }}</span>
+          </div>
         </div>
-        <div class="summary-row">
-          <span>Tax</span>
-          <span>${{ tax.toFixed(2) }}</span>
+
+        <!-- Shipping Details -->
+        <div v-if="selectedAddress" class="mb-6 bg-gray-50 p-4 rounded-lg">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold text-gray-800">Shipping Information</h3>
+            <button @click="changeAddress" 
+                    class="text-sm text-blue-600 hover:text-blue-800 flex items-center transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Change
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-600">
+            <p v-if="selectedAddress.fullName" class="flex items-start">
+              <span class="text-gray-500 mr-2 w-20">Name:</span>
+              <span class="font-medium text-gray-800">{{ selectedAddress.fullName }}</span>
+            </p>
+            <p v-if="selectedAddress.email" class="flex items-start">
+              <span class="text-gray-500 mr-2 w-20">Email:</span>
+              <span class="font-medium text-gray-800">{{ selectedAddress.email }}</span>
+            </p>
+            <p v-if="selectedAddress.phoneNumber" class="flex items-start">
+              <span class="text-gray-500 mr-2 w-20">Phone:</span>
+              <span class="font-medium text-gray-800">{{ selectedAddress.phoneNumber }}</span>
+            </p>
+            <p v-if="selectedAddress.addressLine1" class="flex items-start col-span-full">
+              <span class="text-gray-500 mr-2 w-20">Address:</span>
+              <span class="font-medium text-gray-800">
+                {{ selectedAddress.addressLine1 }}
+                {{ selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : '' }}
+              </span>
+            </p>
+            <p v-if="selectedAddress.city || selectedAddress.state || selectedAddress.postalCode" class="flex items-start col-span-full">
+              <span class="text-gray-500 mr-2 w-20"></span>
+              <span class="font-medium text-gray-800">
+                {{ selectedAddress.city }}, {{ selectedAddress.state }} {{ selectedAddress.postalCode }}
+              </span>
+            </p>
+            <p v-if="selectedAddress.country" class="flex items-start">
+              <span class="text-gray-500 mr-2 w-20">Country:</span>
+              <span class="font-medium text-gray-800">{{ selectedAddress.country }}</span>
+            </p>
+          </div>
         </div>
-        <div class="summary-row total">
-          <span>Total</span>
-          <span>${{ total.toFixed(2) }}</span>
+
+        <!-- Payment Method -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">Payment Method</h3>
+          <div id="paypal-button-container" class="w-full"></div>
         </div>
       </div>
-
-      <!-- Shipping Details -->
-      <div v-if="selectedAddress" class="shipping-details">
-        <h3>Shipping Information</h3>
-        <div class="shipping-info">
-          <p v-if="selectedAddress.fullName"><strong>Name:</strong> {{ selectedAddress.fullName }}</p>
-          <p v-if="selectedAddress.email"><strong>Email:</strong> {{ selectedAddress.email }}</p>
-          <p v-if="selectedAddress.phoneNumber"><strong>Phone:</strong> {{ selectedAddress.phoneNumber }}</p>
-          <p v-if="selectedAddress.addressLine1">
-            <strong>Address:</strong> {{ selectedAddress.addressLine1 }}
-            {{ selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : '' }}
-          </p>
-          <p v-if="selectedAddress.city || selectedAddress.state || selectedAddress.postalCode">
-            {{ selectedAddress.city }},
-            {{ selectedAddress.state }}
-            {{ selectedAddress.postalCode }}
-          </p>
-          <p v-if="selectedAddress.country"><strong>Country:</strong> {{ selectedAddress.country }}</p>
-        </div>
-        <button @click="changeAddress" class="change-address-btn">Change Address</button>
-      </div>
-
-      <!-- PayPal Button -->
-      <div id="paypal-button-container"></div>
     </div>
   </div>
 </template>
@@ -75,22 +112,12 @@ const addresses = ref([]);
 const selectedAddress = ref(null);
 const loadedFromStorage = ref(false);
 
-
 // Use cart store getters for shipping, tax, and total
 const shipping = computed(() => cartStore.shipping);
 const tax = computed(() => cartStore.tax);
 const total = computed(() => cartStore.total);
 
 // Fetch addresses and set the default selected address
-// const fetchAddresses = async () => {
-//   try {
-//     const response = await api.get(`/addresses/user-addresses/${authStore.user.id}`);
-//     addresses.value = response.data;
-//     selectedAddress.value = addresses.value.find(address => address.isDefault);
-//   } catch (error) {
-//     console.error('Error fetching addresses:', error);
-//   }
-// };
 const fetchAddresses = async () => {
   if (loadedFromStorage.value) return;
   
@@ -194,11 +221,6 @@ const loadPayPalButton = () => {
   }).render('#paypal-button-container');
 };
 
-
-
-
-
-
 // Keep selected address in sessionStorage until explicitly cleared
 onMounted(() => {
   const routeState = router.currentRoute.value.state;
@@ -225,94 +247,10 @@ onBeforeUnmount(() => {
 
 onMounted(async () => {
   await cartStore.fetchCart();
-  // await fetchAddresses();
-
+  
   const paypalScript = document.createElement('script');
   paypalScript.src = "https://www.paypal.com/sdk/js?client-id=AceJUHWaafcPScT9WEkm0eDlocn_7QBvYEH2xHX0dOIcqCIopSWz9WaQYzglzSuD0XNmtLQ5sAXkuC9c";
   paypalScript.onload = loadPayPalButton;
   document.body.appendChild(paypalScript);
 });
 </script>
-
-<style scoped>
-.payment-page {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-  display: flex;
-  gap: 2rem;
-  background-color: #f8f9fa;
-}
-
-.order-summary {
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 1.5rem;
-  width: 100%;
-  transition: all 0.3s ease;
-}
-
-.summary-items {
-  border-bottom: 1px solid #e9ecef;
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-
-.summary-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  color: #495057;
-}
-
-.summary-totals {
-  margin-bottom: 1.5rem;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  color: #343a40;
-}
-
-.summary-row.total {
-  font-weight: bold;
-  color: #212529;
-  border-top: 2px solid #dee2e6;
-  padding-top: 0.5rem;
-}
-
-#paypal-button-container {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
-}
-
-h2 {
-  color: #343a40;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid #007bff;
-  padding-bottom: 0.5rem;
-}
-
-.change-address-btn {
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-@media (max-width: 768px) {
-  .payment-page {
-    flex-direction: column;
-    padding: 1rem;
-    gap: 1rem;
-  }
-}
-</style>

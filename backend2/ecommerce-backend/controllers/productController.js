@@ -1,8 +1,10 @@
 // controllers/productController.js
 
 const db = require('../config/db');
-const { Product, User, Category,ProductCategory, Review, sequelize } = require('../models'); // Adjust according to your project structure
+const { Product, User, Category,ProductCategory, Review, sequelize, Image  } = require('../models'); // Adjust according to your project structure
 const { Op } = require('sequelize');
+const { processImage } = require('../utils/imageProcessor');
+// const { calculateRatingDistribution, calculateDiscountedPrice, getDiscountCategory } = require('../utils/productUtils');
 // const sequelize = db.sequelize; 
 
 // Utility functions for discount calculations
@@ -36,39 +38,7 @@ const calculateRatingDistribution = async (productId) => {
 };
 
 
-// exports.getAllProducts = async (req, res) => {
-//   console.log('Getting all products');
-//   try {
-//     console.log('Executing database query...');
-//     const result = await db.query('SELECT * FROM "Products"');
-//     console.log('Query executed. Result:', JSON.stringify(result, null, 2));
-    
-//     let products;
-//     if (Array.isArray(result) && result.length > 0) {
-//       // If result is an array, assume the first element contains the products
-//       products = result[0];
-//     } else if (result && result.rows) {
-//       // If result has a 'rows' property, use that
-//       products = result.rows;
-//     } else {
-//       console.log('Unexpected query result structure');
-//       return res.status(500).json({ error: 'Unexpected query result structure' });
-//     }
-    
-//     if (!Array.isArray(products)) {
-//       console.log('Products is not an array');
-//       return res.status(500).json({ error: 'Unexpected product data structure' });
-//     }
-    
-//     console.log(`Found ${products.length} products`);
-//     console.log('Products:', JSON.stringify(products, null, 2));
-    
-//     res.json(products);
-//   } catch (err) {
-//     console.error('Error getting products:', err);
-//     res.status(500).json({ error: 'Failed to fetch products', details: err.message });
-//   }
-// };
+
 exports.getAllProducts = async (req, res) => {
   console.log('Getting all products');
   try {
@@ -106,6 +76,68 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+exports.getProductById = async (req, res) => {
+  const { id } = req.params;
+  console.log(`Fetching product with ID: ${id}`);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+
+  try {
+    const product = await Product.findByPk(id, {
+      include: [
+        {
+          model: Review,
+          attributes: ['id', 'rating', 'comment', 'createdAt'],
+          include: [
+            {
+              model: User,
+              attributes: ['username'],
+            },
+          ],
+        },
+        {
+          model: Image,
+          as: 'images',
+          attributes: ['id', 'original', 'large', 'medium', 'small', 'thumbnail']
+        }
+      ],
+    });
+
+    if (!product) {
+      console.log(`Product with id ${id} not found`);
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Calculate rating distribution
+    const ratingDistribution = await calculateRatingDistribution(id);
+
+    // Convert to JSON and add additional fields
+    const productData = product.toJSON();
+
+    const productWithDetails = {
+      ...productData,
+      discountedPrice: calculateDiscountedPrice(productData.price, productData.discountPercentage),
+      discountCategory: getDiscountCategory(productData.discountPercentage),
+      ratingDistribution,
+      images: productData.images.map(image => ({
+        ...image,
+        original: `${process.env.BASE_URL}/${image.original}`,
+        large: `${process.env.BASE_URL}/${image.large}`,
+        medium: `${process.env.BASE_URL}/${image.medium}`,
+        small: `${process.env.BASE_URL}/${image.small}`,
+        thumbnail: `${process.env.BASE_URL}/${image.thumbnail}`
+      }))
+    };
+
+    console.log(`Found product: ${JSON.stringify(productWithDetails)}`);
+    res.json(productWithDetails);
+  } catch (err) {
+    console.error(`Error fetching product with id ${id}:`, err);
+    res.status(500).json({ error: 'Failed to fetch product', details: err.message });
+  }
+};
 
 
 exports.getProductById = async (req, res) => {
@@ -220,38 +252,196 @@ exports.createProduct = async (req, res) => {
   }
 };
 
+// exports.updateProduct = async (req, res) => {
+//   const { id } = req.params;
+//   const { name, description, price, discountPercentage } = req.body;
+//   console.log(`Updating product with id: ${id}`);
+//   try {
+//     const productData = {
+//       name,
+//       description,
+//       price,
+//       discountPercentage,
+//       discountCategory: getDiscountCategory(discountPercentage)
+//     };
+
+//     const result = await db.query(
+//       'UPDATE "Products" SET name = $1, description = $2, price = $3, discountPercentage = $4, discountCategory = $5 WHERE id = $6 RETURNING *',
+//       [name, description, price, discountPercentage, productData.discountCategory, id]
+//     );
+    
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ error: 'Product not found' });
+//     }
+    
+//     console.log(`Product with id ${id} updated successfully`);
+//     res.json({
+//       ...result.rows[0],
+//       discountedPrice: calculateDiscountedPrice(price, discountPercentage)
+//     });
+//   } catch (err) {
+//     console.error(`Error updating product with id ${id}:`, err);
+//     res.status(500).json({ error: 'Failed to update product' });
+//   }
+// };
+// exports.updateProduct = async (req, res) => {
+//   const { id } = req.params;
+//   const { name, description, price, discountPercentage, categoryIds } = req.body;
+
+//   try {
+//     // Start a transaction
+//     const transaction = await sequelize.transaction();
+
+//     // Update product
+//     const [updated] = await Product.update(
+//       { name, description, price, discountPercentage },
+//       { where: { id }, transaction }
+//     );
+
+//     if (!updated) {
+//       await transaction.rollback();
+//       return res.status(404).json({ error: 'Product not found' });
+//     }
+
+//     // Update categories
+//     const product = await Product.findByPk(id, { transaction });
+//     if (categoryIds && categoryIds.length > 0) {
+//       await product.setCategories(categoryIds, { transaction });
+//     }
+
+//     // Commit transaction
+//     await transaction.commit();
+
+//     // Fetch updated product with categories
+//     const updatedProduct = await Product.findByPk(id, {
+//       include: [{
+//         model: Category,
+//         through: { attributes: [] },
+//         attributes: ['id', 'name']
+//       }]
+//     });
+
+//     res.json(updatedProduct);
+//   } catch (error) {
+//     await transaction.rollback();
+//     console.error(`Error updating product with id ${id}:`, error);
+//     res.status(500).json({ error: 'Failed to update product', details: error.message });
+//   }
+// };
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { name, description, price, discountPercentage } = req.body;
-  console.log(`Updating product with id: ${id}`);
-  try {
-    const productData = {
-      name,
-      description,
-      price,
-      discountPercentage,
-      discountCategory: getDiscountCategory(discountPercentage)
-    };
+  const { name, description, price, discountPercentage, categoryIds } = req.body;
 
-    const result = await db.query(
-      'UPDATE "Products" SET name = $1, description = $2, price = $3, discountPercentage = $4, discountCategory = $5 WHERE id = $6 RETURNING *',
-      [name, description, price, discountPercentage, productData.discountCategory, id]
+  console.log('Updating product with ID:', id);
+  console.log('Request body:', req.body);
+
+  // Validate required fields
+  if (!name || !description || price === undefined || discountPercentage === undefined) {
+    console.error('Validation failed: Missing required fields');
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // Validate category IDs
+  if (categoryIds && !Array.isArray(categoryIds)) {
+    console.error('Validation failed: categoryIds must be an array');
+    return res.status(400).json({ error: 'categoryIds must be an array' });
+  }
+
+  try {
+    // Start a transaction
+    const transaction = await sequelize.transaction();
+    console.log('Transaction started');
+
+    // Update product
+    const [updated] = await Product.update(
+      { name, description, price, discountPercentage },
+      { where: { id }, transaction }
     );
-    
-    if (result.rows.length === 0) {
+
+    if (!updated) {
+      console.error('Product not found');
+      await transaction.rollback();
       return res.status(404).json({ error: 'Product not found' });
     }
-    
-    console.log(`Product with id ${id} updated successfully`);
-    res.json({
-      ...result.rows[0],
-      discountedPrice: calculateDiscountedPrice(price, discountPercentage)
+
+    console.log('Product updated:', updated);
+
+    // Update categories
+    const product = await Product.findByPk(id, { transaction });
+    if (categoryIds && categoryIds.length > 0) {
+      console.log('Updating categories:', categoryIds);
+      await product.setCategories(categoryIds, { transaction });
+    }
+
+    // Commit transaction
+    await transaction.commit();
+    console.log('Transaction committed');
+
+    // Fetch updated product with categories
+    const updatedProduct = await Product.findByPk(id, {
+      include: [{
+        model: Category,
+        through: { attributes: [] },
+        attributes: ['id', 'name']
+      }]
     });
-  } catch (err) {
-    console.error(`Error updating product with id ${id}:`, err);
-    res.status(500).json({ error: 'Failed to update product' });
+
+    console.log('Updated product:', updatedProduct);
+
+    res.json(updatedProduct);
+  } catch (error) {
+    console.error('Error during product update:', error);
+
+    if (transaction) {
+      await transaction.rollback();
+      console.log('Transaction rolled back');
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to update product',
+      details: error.message 
+    });
   }
 };
+
+// // In productController.js
+// exports.getAllCategories = async (req, res) => {
+//   try {
+//     const categories = await Category.findAll({
+//       order: [['isMainCategory', 'DESC'], ['name', 'ASC']]
+//     });
+//     res.json(categories);
+//   } catch (error) {
+//     res.status(500).json({ error: 'Failed to fetch categories' });
+//   }
+// }
+
+// In productController.js
+exports.getAllCategories = async (req, res) => {
+  try {
+    // Fetch all categories
+    const categories = await Category.findAll({
+      order: [['isMainCategory', 'DESC'], ['name', 'ASC']]
+    });
+
+    // Organize categories into a hierarchy
+    const mainCategories = categories.filter(cat => cat.isMainCategory);
+    const subCategories = categories.filter(cat => !cat.isMainCategory);
+
+    const hierarchicalCategories = mainCategories.map(parent => ({
+      ...parent.toJSON(),
+      children: subCategories
+        .filter(child => child.parentId === parent.id)
+        .map(child => child.toJSON())
+    }));
+
+    res.json(hierarchicalCategories);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+};
+
 
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
@@ -778,3 +968,64 @@ exports.getLatestProducts = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch latest products', details: error.message });
   }
 };
+
+
+
+
+
+exports.uploadProductImages = async (req, res) => {
+  const productId = req.params.id;
+  console.log(`Uploading images for product ID: ${productId}`);
+
+  try {
+    // Validate product existence
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No images uploaded' });
+    }
+
+    const images = [];
+
+    // Process each uploaded file
+    for (const file of req.files) {
+      // Process image into multiple sizes
+      const processed = await processImage(file.path, 'product');
+
+      // Save image metadata to the database
+      const image = await Image.create({
+        type: 'product',
+        original: processed.large,
+        large: processed.large,
+        medium: processed.medium,
+        small: processed.small,
+        thumbnail: processed.thumbnail,
+        productId
+      });
+
+      images.push(image);
+    }
+
+    res.status(201).json({
+      message: 'Images uploaded successfully',
+      images
+    });
+  } catch (error) {
+    console.error('Image upload error:', error);
+
+    // Cleanup uploaded files on error
+    if (req.files) {
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      });
+    }
+
+    res.status(500).json({ error: 'Failed to upload images', details: error.message });
+  }
+};
+
+

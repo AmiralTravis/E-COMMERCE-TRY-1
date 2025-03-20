@@ -1263,7 +1263,324 @@
 
 
 
+// <!-- /components/PaymentPage.vue -->
+// <template>
+//   <div class="payment-page">
+//     <div class="order-summary">
+//       <h2>Order Summary</h2>
 
+//       <!-- Cart Items -->
+//       <div class="summary-items">
+//         <div v-for="item in cartStore.items" :key="item.id" class="summary-item">
+//           <span>{{ item.name }} x {{ item.quantity }}</span>
+//           <span>${{ (item.price * item.quantity).toFixed(2) }}</span>
+//         </div>
+//       </div>
+
+//       <!-- Totals -->
+//       <div class="summary-totals">
+//         <div class="summary-row">
+//           <span>Subtotal</span>
+//           <span>${{ cartStore.totalPrice.toFixed(2) }}</span>
+//         </div>
+//         <div class="summary-row">
+//           <span>Shipping</span>
+//           <span>${{ shipping.toFixed(2) }}</span>
+//         </div>
+//         <div class="summary-row">
+//           <span>Tax</span>
+//           <span>${{ tax.toFixed(2) }}</span>
+//         </div>
+//         <div class="summary-row total">
+//           <span>Total</span>
+//           <span>${{ total.toFixed(2) }}</span>
+//         </div>
+//       </div>
+
+//       <!-- Shipping Details -->
+//       <div v-if="selectedAddress" class="shipping-details">
+//         <h3>Shipping Information</h3>
+//         <div class="shipping-info">
+//           <p v-if="selectedAddress.fullName"><strong>Name:</strong> {{ selectedAddress.fullName }}</p>
+//           <p v-if="selectedAddress.email"><strong>Email:</strong> {{ selectedAddress.email }}</p>
+//           <p v-if="selectedAddress.phoneNumber"><strong>Phone:</strong> {{ selectedAddress.phoneNumber }}</p>
+//           <p v-if="selectedAddress.addressLine1">
+//             <strong>Address:</strong> {{ selectedAddress.addressLine1 }}
+//             {{ selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : '' }}
+//           </p>
+//           <p v-if="selectedAddress.city || selectedAddress.state || selectedAddress.postalCode">
+//             {{ selectedAddress.city }},
+//             {{ selectedAddress.state }}
+//             {{ selectedAddress.postalCode }}
+//           </p>
+//           <p v-if="selectedAddress.country"><strong>Country:</strong> {{ selectedAddress.country }}</p>
+//         </div>
+//         <button @click="changeAddress" class="change-address-btn">Change Address</button>
+//       </div>
+
+//       <!-- PayPal Button -->
+//       <div id="paypal-button-container"></div>
+//     </div>
+//   </div>
+// </template>
+
+// <script setup>
+// import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+// import { useRouter } from 'vue-router';
+// import { useCartStore } from '../stores/cart';
+// import { useAuthStore } from '../stores/auth';
+// import api from '../services/api';
+
+// const cartStore = useCartStore();
+// const authStore = useAuthStore();
+// const router = useRouter();
+
+// const shippingDetails = ref(null);
+// const addresses = ref([]);
+// const selectedAddress = ref(null);
+// const loadedFromStorage = ref(false);
+
+
+// // Use cart store getters for shipping, tax, and total
+// const shipping = computed(() => cartStore.shipping);
+// const tax = computed(() => cartStore.tax);
+// const total = computed(() => cartStore.total);
+
+// // Fetch addresses and set the default selected address
+// // const fetchAddresses = async () => {
+// //   try {
+// //     const response = await api.get(`/addresses/user-addresses/${authStore.user.id}`);
+// //     addresses.value = response.data;
+// //     selectedAddress.value = addresses.value.find(address => address.isDefault);
+// //   } catch (error) {
+// //     console.error('Error fetching addresses:', error);
+// //   }
+// // };
+// const fetchAddresses = async () => {
+//   if (loadedFromStorage.value) return;
+  
+//   try {
+//     const response = await api.get(`/addresses/user-addresses/${authStore.user.id}`);
+//     addresses.value = response.data;
+//   } catch (error) {
+//     console.error('Error fetching addresses:', error);
+//   }
+// };
+
+// // Navigate back to the address selection page
+// const changeAddress = () => {
+//   router.push('/checkout/address');
+// };
+
+// // Create the order in the backend before PayPal starts
+// const handleSubmit = async () => {
+//   try {
+//     if (cartStore.items.length === 0) {
+//       throw new Error('Cannot submit order with an empty cart');
+//     }
+
+//     const response = await api.post('/orders', {
+//       items: cartStore.items.map(item => ({
+//         productId: item.productId,
+//         quantity: item.quantity,
+//         price: item.price
+//       })),
+//       totalAmount: cartStore.total, // Use the total including shipping and tax
+//       shippingDetails: shippingDetails.value
+//     });
+
+//     return response.data.id; // Return the order ID
+//   } catch (error) {
+//     console.error('Error creating order:', error);
+//     return null;
+//   }
+// };
+
+// // Load PayPal button and set up payment flow
+// const loadPayPalButton = () => {
+//   window.paypal.Buttons({
+//     createOrder: async (data, actions) => {
+//       const orderId = await handleSubmit(); // Create order in backend
+//       if (!orderId) {
+//         alert('Failed to create order. Please try again.');
+//         return;
+//       }
+//       // Pass the order ID to PayPal for payment processing
+//       return actions.order.create({
+//         purchase_units: [{
+//           amount: { 
+//             currency_code: 'USD', // Add currency_code here
+//             value: total.value.toFixed(2), // Include shipping and tax
+//             breakdown: {
+//               item_total: { 
+//                 currency_code: 'USD', // Add currency_code here
+//                 value: cartStore.totalPrice.toFixed(2) // Subtotal
+//               },
+//               shipping: { 
+//                 currency_code: 'USD', // Add currency_code here
+//                 value: shipping.value.toFixed(2) // Shipping
+//               },
+//               tax_total: { 
+//                 currency_code: 'USD', // Add currency_code here
+//                 value: tax.value.toFixed(2) // Tax
+//               }
+//             }
+//           }
+//         }]
+//       });
+//     },
+
+//     onApprove: async (data, actions) => {
+//       try {
+//         // First capture the payment
+//         await actions.order.capture();
+        
+//         // Then verify with your backend
+//         await api.post('/paypal/verify-order', {
+//           orderId: data.orderID,
+//           totalAmount: parseFloat(total.value.toFixed(2)) // Use the total including shipping and tax
+//         });
+
+//         // Try to clear the cart
+//         await cartStore.clearCart();
+
+//         // Navigate to success page
+//         router.push('/order-success');
+//       } catch (error) {
+//         console.error('Payment Error:', error);
+//         alert('Payment failed. Please try again.');
+//       }
+//     },
+
+//     onError: (err) => {
+//       console.error('PayPal Checkout Error:', err);
+//       alert('There was an error with PayPal checkout. Please try again.');
+//     }
+//   }).render('#paypal-button-container');
+// };
+
+
+
+
+
+
+// // Keep selected address in sessionStorage until explicitly cleared
+// onMounted(() => {
+//   const routeState = router.currentRoute.value.state;
+//   const storedAddress = sessionStorage.getItem('selectedAddress');
+
+//   if (routeState?.selectedAddress) {
+//     sessionStorage.setItem('selectedAddress', JSON.stringify(routeState.selectedAddress));
+//     selectedAddress.value = routeState.selectedAddress;
+//   } else if (storedAddress) {
+//     selectedAddress.value = JSON.parse(storedAddress);
+//   } else {
+//     fetchAddresses().then(() => {
+//       selectedAddress.value = addresses.value.find(a => a.isDefault);
+//     });
+//   }
+// });
+
+// // Clear storage when leaving payment page
+// onBeforeUnmount(() => {
+//   if (!router.currentRoute.value.path.includes('/checkout/payment')) {
+//     sessionStorage.removeItem('selectedAddress');
+//   }
+// });
+
+// onMounted(async () => {
+//   await cartStore.fetchCart();
+//   // await fetchAddresses();
+
+//   const paypalScript = document.createElement('script');
+//   paypalScript.src = "https://www.paypal.com/sdk/js?client-id=AceJUHWaafcPScT9WEkm0eDlocn_7QBvYEH2xHX0dOIcqCIopSWz9WaQYzglzSuD0XNmtLQ5sAXkuC9c";
+//   paypalScript.onload = loadPayPalButton;
+//   document.body.appendChild(paypalScript);
+// });
+// </script>
+
+// <style scoped>
+// .payment-page {
+//   max-width: 800px;
+//   margin: 0 auto;
+//   padding: 2rem;
+//   display: flex;
+//   gap: 2rem;
+//   background-color: #f8f9fa;
+// }
+
+// .order-summary {
+//   background-color: white;
+//   border-radius: 12px;
+//   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+//   padding: 1.5rem;
+//   width: 100%;
+//   transition: all 0.3s ease;
+// }
+
+// .summary-items {
+//   border-bottom: 1px solid #e9ecef;
+//   padding-bottom: 1rem;
+//   margin-bottom: 1rem;
+// }
+
+// .summary-item {
+//   display: flex;
+//   justify-content: space-between;
+//   margin-bottom: 0.5rem;
+//   color: #495057;
+// }
+
+// .summary-totals {
+//   margin-bottom: 1.5rem;
+// }
+
+// .summary-row {
+//   display: flex;
+//   justify-content: space-between;
+//   margin-bottom: 0.5rem;
+//   color: #343a40;
+// }
+
+// .summary-row.total {
+//   font-weight: bold;
+//   color: #212529;
+//   border-top: 2px solid #dee2e6;
+//   padding-top: 0.5rem;
+// }
+
+// #paypal-button-container {
+//   width: 100%;
+//   display: flex;
+//   justify-content: center;
+//   margin-top: 1rem;
+// }
+
+// h2 {
+//   color: #343a40;
+//   margin-bottom: 1rem;
+//   border-bottom: 2px solid #007bff;
+//   padding-bottom: 0.5rem;
+// }
+
+// .change-address-btn {
+//   margin-top: 1rem;
+//   padding: 0.5rem 1rem;
+//   background-color: #007bff;
+//   color: white;
+//   border: none;
+//   border-radius: 4px;
+//   cursor: pointer;
+// }
+
+// @media (max-width: 768px) {
+//   .payment-page {
+//     flex-direction: column;
+//     padding: 1rem;
+//     gap: 1rem;
+//   }
+// }
+// </style>
 
 
 
@@ -2187,4 +2504,2190 @@
 //   background-color: green;
 //   color: white;
 // }
+// </style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // // tailwind.config/js
+// /** @type {import('tailwindcss').Config} */
+
+
+
+// module.exports = {
+//     content: [
+//       "./index.html",
+//       "./src/**/*.{vue,js,ts,jsx,tsx}",
+//     ],
+//     theme: {
+//       extend: {
+//         // colors: {
+//         //   primary: '#3498db',
+//         //   'primary-dark': '#2980b9'
+//         // }
+//       },
+//     },
+//     plugins: [],
+//   }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// <!-- /components/ProductImageManagamenet.vue -->
+
+// <template>
+//   <section class="panel mt-6 main-panel">
+//     <h2 class="section-title text-lg font-semibold mb-4 pb-2 border-b border-gray-200">Product Images</h2>
+//     <div class="image-management-container">
+//       <!-- Main Display Image with Upload -->
+//       <div class="main-image-container group" @click="triggerMainImageUpload">
+//         <div class="product-image-container">
+//           <div v-if="mainImage" class="product-image-preview">
+//             <img
+//               :src="mainImage.url"
+//               alt="Main product image"
+//               class="product-image"
+//             />
+//             <button 
+//               @click.stop="removeMainImage"
+//               class="absolute top-2 right-2 bg-white rounded-full p-1 shadow-sm hover:bg-red-50"
+//             >
+//               <TrashIcon class="w-4 h-4 text-red-500" />
+//             </button>
+//             <button
+//               @click.stop="triggerMainImageUpload"
+//               class="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full text-sm shadow-sm hover:bg-gray-100"
+//             >
+//               Change Image
+//             </button>
+//           </div>
+//           <div v-else class="upload-prompt">
+//             <div class="flex flex-col items-center justify-center w-full h-full">
+//               <PlusCircleIcon class="w-12 h-12 text-gray-400 mb-2" />
+//               <p class="text-gray-500 text-sm">Upload Main Image</p>
+//             </div>
+//           </div>
+//           <input 
+//             ref="mainImageInput"
+//             type="file"
+//             accept="image/*"
+//             class="hidden"
+//             @change="handleMainImageUpload"
+//           />
+//         </div>
+//       </div>
+
+//       <!-- Thumbnails and Upload Section -->
+//       <div class="thumbnails-section">
+//         <div class="thumbnails-container" ref="thumbnailsContainer">
+//           <!-- Map each image to a thumbnail -->
+//           <div 
+//             v-for="(image, index) in productImages" 
+//             :key="image.id"
+//             class="thumbnail-container"
+//             data-type="image"
+//           >
+//             <img 
+//               :src="image.url" 
+//               alt="Product thumbnail" 
+//               class="w-full h-full object-cover"
+//               @click="openLightbox(index)"
+//             />
+//             <button 
+//               @click.stop="removeImage(index)" 
+//               class="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow-sm hover:bg-red-50"
+//             >
+//               <TrashIcon class="w-4 h-4 text-red-500" />
+//             </button>
+//           </div>
+
+//           <!-- Add Thumbnail Button -->
+//           <div 
+//             v-if="productImages.length < 20" 
+//             class="add-image-container"
+//             data-type="add-button"
+//             @click="triggerFileUpload"
+//           >
+//             <input 
+//               ref="fileInput"
+//               type="file"
+//               accept="image/*"
+//               multiple
+//               class="hidden"
+//               @change="handleFileUpload"
+//             />
+//             <PlusCircleIcon class="w-8 h-8 text-gray-400" />
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+
+//     <!-- Lightbox -->
+//     <div v-if="lightboxVisible" class="lightbox" @click="closeLightbox">
+//       <div class="lightbox-content">
+//         <div 
+//           class="zoom-container"
+//           :class="{'cursor-zoom-in': !zoomActive, 'cursor-zoom-out': zoomActive}"
+//           @click.stop="toggleZoomActive"
+//           @mousemove="handleZoom"
+//           @mouseleave="isZoomed = false"
+//           :title="zoomActive ? 'Click to disable zoom' : 'Click to enable hover-zoom'"
+//         >
+//           <div v-if="!zoomActive" class="zoom-hint">Click to zoom</div>
+//           <img 
+//             :src="productImages[lightboxIndex]?.url" 
+//             alt="Product image"
+//             class="lightbox-image"
+//             ref="lightboxImage"
+//             :style="zoomStyle"
+//           />
+//         </div>
+//         <button 
+//           class="lightbox-close"
+//           @click.stop="closeLightbox"
+//         >×</button>
+//         <button 
+//           class="lightbox-nav prev"
+//           @click.stop="prevImage"
+//         >&#10094;</button>
+//         <button 
+//           class="lightbox-nav next"
+//           @click.stop="nextImage"
+//         >&#10095;</button>
+//       </div>
+//     </div>
+
+//     <!-- Help Text -->
+//     <div class="mt-3 text-sm text-gray-500 flex justify-between items-center">
+//       <span>Drag to reorder. Maximum 20 images allowed. <br>Note: Images will be displayed in the order arranged in here. </span>
+//       <span>{{ productImages?.length || 0 }}/20 images</span>
+
+//     </div>
+//   </section>
+// </template>
+
+// <script setup>
+// import { ref, computed, onMounted } from 'vue';
+// import { TrashIcon, PlusCircleIcon } from '@heroicons/vue/24/outline';
+// import Sortable from 'sortablejs';
+// import { toast } from 'vue3-toastify';
+// import api from '@/services/api';
+// import { useRoute } from 'vue-router';
+
+// const route = useRoute();
+
+// // Props to receive and emit product images
+// const props = defineProps({
+//   modelValue: {
+//     type: Array,
+//     default: () => []
+//   }
+// });
+
+// const emit = defineEmits(['update:modelValue']);
+
+// // Image states
+// const mainImage = ref(null);
+
+
+// const productImages = computed({
+//   get: () => Array.isArray(props.modelValue) ? props.modelValue : [], // Ensure it's always an array
+//   set: (val) => emit('update:modelValue', val)
+// });
+
+// // Lightbox state
+// const lightboxVisible = ref(false);
+// const lightboxIndex = ref(0);
+// const lightboxImage = ref(null);
+
+// const isZoomed = ref(false);
+// const zoomActive = ref(false); // Toggleable zoom state
+// const zoomPosition = ref({ x: 0, y: 0 });
+
+// // Refs
+// const mainImageInput = ref(null);
+// const fileInput = ref(null);
+// const thumbnailsContainer = ref(null);
+
+// const totalImages = computed(() => 
+//   (mainImage.value ? 1 : 0) + (productImages.value?.length || 0)
+// );
+
+// // Load product images on mount
+// // const loadProductImages = async () => {
+// //   try {
+// //     const response = await api.get(`/admin/products/${route.params.id}`);
+// //     // Ensure images array exists
+// //     productImages.value = response.data.images || response.data.productImages || [];
+// //     mainImage.value = response.data.mainImage || null;
+// //   } catch (error) {
+// //     console.error('Error loading product images:', error);
+// //     toast.error('Failed to load product images');
+// //   }
+// // };
+// const loadProductImages = async () => {
+//   try {
+//     // Skip if no product ID (e.g., on the Add Product page)
+//     if (!route.params.id) {
+//       productImages.value = [];
+//       mainImage.value = null;
+//       return;
+//     }
+
+//     const response = await api.get(`/admin/products/${route.params.id}`);
+//     // Ensure images array exists
+//     productImages.value = response.data.images || response.data.productImages || [];
+//     mainImage.value = response.data.mainImage || null;
+//   } catch (error) {
+//     console.error('Error loading product images:', error);
+//     toast.error('Failed to load product images');
+//   }
+// };
+
+// onMounted(async () => {
+//   await loadProductImages();
+// });
+
+// // Main image handling
+// const triggerMainImageUpload = () => {
+//   mainImageInput.value.click();
+// };
+
+// const handleMainImageUpload = async (event) => {
+//   const file = event.target.files[0];
+//   if (!file) return;
+
+//   // Client-side validation
+//   if (!file.type.startsWith('image/')) {
+//     toast.error('Please upload an image file');
+//     return;
+//   }
+//   if (file.size > 5 * 1024 * 1024) {
+//     toast.error('Image size must be less than 5MB');
+//     return;
+//   }
+
+//   try {
+//     const formData = new FormData();
+//     formData.append('image', file);
+    
+//     const response = await api.put(
+//       `/admin/products/${route.params.id}/main-image`, 
+//       formData,
+//       { headers: { 'Content-Type': 'multipart/form-data' }
+//   });
+    
+//     // Update to match new structure
+//     mainImage.value = { url: response.data.imageUrl };
+//     toast.success('Main image updated');
+//   } catch (error) {
+//     toast.error('Failed to upload main image');
+//   }
+// };
+
+// // Thumbnail handling
+// const triggerFileUpload = () => {
+//   if (productImages.value.length >= 20) {
+//     toast.error('Maximum 20 thumbnails allowed');
+//     return;
+//   }
+//   fileInput.value.click();
+// };
+
+// // const handleFileUpload = async (event) => {
+// //   const files = event.target.files;
+// //   if (!files || files.length === 0) {
+// //     toast.error('No files selected');
+// //     return;
+// //   }
+
+// //   // Check remaining slots
+// //   const remainingSlots = 20 - (productImages.value?.length || 0);
+// //   if (files.length > remainingSlots) {
+// //     toast.error(`You can only upload ${remainingSlots} more thumbnails`);
+// //     return;
+// //   }
+
+// //   // Validate file sizes
+// //   let valid = true;
+// //   Array.from(files).forEach(file => {
+// //     if (file.size > 5 * 1024 * 1024) {
+// //       toast.error(`${file.name} exceeds 5MB size limit`);
+// //       valid = false;
+// //     }
+// //   });
+
+// //   if (!valid) return;
+
+// //   try {
+// //     const formData = new FormData();
+// //     Array.from(files).forEach(file => {
+// //       formData.append('thumbnails', file);
+// //     });
+
+// //     const response = await api.post(
+// //       `/admin/products/${route.params.id}/thumbnails`,
+// //       formData,
+// //       {
+// //         headers: { 'Content-Type': 'multipart/form-data' },
+// //         onUploadProgress: (progressEvent) => {
+// //           const percentCompleted = Math.round(
+// //             (progressEvent.loaded * 100) / progressEvent.total
+// //           );
+// //           console.log(`Upload progress: ${percentCompleted}%`);
+// //         }
+// //       }
+// //     );
+
+// //     productImages.value = [
+// //       ...(productImages.value || []),
+// //       ...response.data.map(img => ({ id: img.id, url: img.url }))
+// //     ];
+
+// //     toast.success('Thumbnails added successfully');
+// //   } catch (error) {
+// //     console.error('Upload error:', {
+// //       message: error.message,
+// //       response: error.response?.data,
+// //       stack: error.stack
+// //     });
+
+// //     const errorMessage = error.response?.data?.error || 
+// //                         error.response?.data?.message || 
+// //                         'Failed to upload thumbnails';
+// //     toast.error(errorMessage);
+// //   } finally {
+// //     event.target.value = '';
+// //   }
+// // };
+
+// // Lightbox functionality
+// const handleFileUpload = async (event) => {
+//   const files = event.target.files;
+//   if (!files || files.length === 0) {
+//     toast.error('No files selected');
+//     return;
+//   }
+
+//   // Check remaining slots
+//   const remainingSlots = 20 - (productImages.value?.length || 0);
+//   if (files.length > remainingSlots) {
+//     toast.error(`You can only upload ${remainingSlots} more thumbnails`);
+//     return;
+//   }
+
+//   // Validate file sizes
+//   let valid = true;
+//   Array.from(files).forEach(file => {
+//     if (file.size > 5 * 1024 * 1024) {
+//       toast.error(`${file.name} exceeds 5MB size limit`);
+//       valid = false;
+//     }
+//   });
+
+//   if (!valid) return;
+
+//   try {
+//     const formData = new FormData();
+//     Array.from(files).forEach(file => {
+//       formData.append('thumbnails', file);
+//     });
+
+//     // If no product ID (new product), skip upload and store files locally
+//     if (!route.params.id) {
+//       const localImages = Array.from(files).map(file => ({
+//         id: null, // No ID yet
+//         url: URL.createObjectURL(file), // Create a local URL for preview
+//         file // Store the file for later upload
+//       }));
+//       productImages.value = [...productImages.value, ...localImages];
+//       return;
+//     }
+
+//     // If product ID exists, upload images to the server
+//     const response = await api.post(
+//       `/admin/products/${route.params.id}/thumbnails`,
+//       formData,
+//       {
+//         headers: { 'Content-Type': 'multipart/form-data' },
+//         onUploadProgress: (progressEvent) => {
+//           const percentCompleted = Math.round(
+//             (progressEvent.loaded * 100) / progressEvent.total
+//           );
+//           console.log(`Upload progress: ${percentCompleted}%`);
+//         }
+//       }
+//     );
+
+//     productImages.value = [
+//       ...(productImages.value || []),
+//       ...response.data.map(img => ({ id: img.id, url: img.url }))
+//     ];
+
+//     toast.success('Thumbnails added successfully');
+//   } catch (error) {
+//     console.error('Upload error:', {
+//       message: error.message,
+//       response: error.response?.data,
+//       stack: error.stack
+//     });
+
+//     const errorMessage = error.response?.data?.error || 
+//                         error.response?.data?.message || 
+//                         'Failed to upload thumbnails';
+//     toast.error(errorMessage);
+//   } finally {
+//     event.target.value = '';
+//   }
+// };
+
+// const toggleZoomActive = () => {
+//   zoomActive.value = !zoomActive.value;
+//   if (!zoomActive.value) {
+//     isZoomed.value = false;
+//   }
+// };
+
+// const handleZoom = (event) => {
+//   if (!zoomActive.value || !lightboxImage.value) return;
+  
+//   const rect = lightboxImage.value.getBoundingClientRect();
+//   const x = ((event.clientX - rect.left) / rect.width) * 100;
+//   const y = ((event.clientY - rect.top) / rect.height) * 100;
+  
+//   zoomPosition.value = { x, y };
+//   isZoomed.value = true;
+// };
+
+// const zoomStyle = computed(() => {
+//   if (!isZoomed.value || !zoomActive.value) return {};
+//   return {
+//     transform: 'scale(2)',
+//     transformOrigin: `${zoomPosition.value.x}% ${zoomPosition.value.y}%`
+//   };
+// });
+
+// // Lightbox navigation
+// const prevImage = () => {
+//   lightboxIndex.value = lightboxIndex.value > 0 
+//     ? lightboxIndex.value - 1 
+//     : (productImages.value?.length || 0) - 1;
+//   resetZoomState();
+// };
+
+// const nextImage = () => {
+//   lightboxIndex.value = lightboxIndex.value < (productImages.value?.length || 0) - 1 
+//     ? lightboxIndex.value + 1 
+//     : 0;
+//   resetZoomState();
+// };
+
+// const resetZoomState = () => {
+//   zoomActive.value = false;
+//   isZoomed.value = false;
+// };
+
+// // Open lightbox
+// const openLightbox = (index) => {
+//   lightboxIndex.value = index;
+//   lightboxVisible.value = true;
+//   resetZoomState();
+// };
+
+// // Close lightbox
+// const closeLightbox = () => {
+//   lightboxVisible.value = false;
+//   resetZoomState();
+// };
+
+// // Remove an image
+// const removeImage = async (index) => {
+//   const image = productImages.value?.[index];
+//   if (!image?.id) {
+//     productImages.value.splice(index, 1);
+//     return;
+//   }
+
+//   try {
+//     await api.delete(`/admin/products/${route.params.id}/images/${image.id}`);
+//     productImages.value.splice(index, 1);
+//     toast.success('Image removed');
+//   } catch (error) {
+//     toast.error('Failed to remove image');
+//   }
+// };
+
+// // Remove main image
+// const removeMainImage = () => {
+//   mainImage.value = null;
+// };
+
+// // Initialize Sortable.js for drag and drop
+// onMounted(() => {
+//   if (thumbnailsContainer.value && productImages.value) {
+//     Sortable.create(thumbnailsContainer.value, {
+//       animation: 150,
+//       filter: '[data-type="add-button"]', // Prevent dragging the add button
+//       preventOnFilter: false,
+//       onMove: function(evt) {
+//         const targetNode = evt.related;
+//         if (targetNode && targetNode.getAttribute('data-type') === 'add-button') {
+//           return false; // Prevent dragging over the add button
+//         }
+//       },
+//       onEnd: (evt) => {
+//         if (evt.oldIndex === evt.newIndex) return; // No change
+
+//         const newImages = [...productImages.value];
+//         const [movedItem] = newImages.splice(evt.oldIndex, 1);
+//         newImages.splice(evt.newIndex, 0, movedItem);
+
+//         // Emit new order immediately
+//         productImages.value = newImages;
+//       }
+//     });
+//   }
+// });
+// </script>
+
+// <style scoped>
+// .main-panel {
+//   min-height: 400px;
+// }
+
+// .image-management-container {
+//   display: flex;
+//   flex-direction: row;
+//   gap: 1rem;
+//   align-items: flex-start;
+// }
+
+// .main-image-container {
+//   position: relative;
+//   width: 300px;
+//   height: 300px;
+//   background-color: #f3f4f6;
+//   border-radius: 0.5rem;
+//   overflow: hidden;
+//   border: 2px dashed #e5e7eb;
+//   cursor: pointer;
+//   transition: border-color 0.3s;
+// }
+
+// .main-image-container:hover {
+//   border-color: #3b82f6;
+// }
+
+// .product-image-container {
+//   width: 100%;
+//   height: 100%;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   position: relative;
+// }
+
+// .product-image-preview {
+//   width: 100%;
+//   height: 100%;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   position: relative;
+// }
+
+// .product-image {
+//   max-width: 100%;
+//   max-height: 100%;
+//   object-fit: contain;
+// }
+
+// .upload-prompt {
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   width: 100%;
+//   height: 100%;
+//   text-align: center;
+// }
+
+// .thumbnails-section {
+//   width: calc(100% - 300px - 1rem);
+// }
+
+// .thumbnails-container {
+//   display: grid;
+//   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+//   gap: 0.5rem;
+// }
+
+// .thumbnail-container {
+//   position: relative;
+//   width: 100%;
+//   height: 100px;
+//   background-color: #f3f4f6;
+//   border-radius: 0.5rem;
+//   overflow: hidden;
+//   border: 1px solid #e5e7eb;
+//   cursor: pointer;
+// }
+
+// .add-image-container {
+//   width: 100%;
+//   height: 100px;
+//   background-color: #f9fafb;
+//   border-radius: 0.5rem;
+//   border: 1px dashed #d1d5db;
+//   cursor: pointer;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+// }
+
+// .lightbox {
+//   position: fixed;
+//   top: 0;
+//   left: 0;
+//   width: 100%;
+//   height: 100%;
+//   background-color: rgba(0, 0, 0, 0.8);
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   z-index: 1000;
+// }
+
+// .lightbox-content {
+//   position: relative;
+//   width: 80vw;
+//   height: 80vh;
+//   max-width: 1200px;
+// }
+
+// .zoom-container {
+//   width: 100%;
+//   height: 100%;
+//   overflow: hidden;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   transition: cursor 0.2s;
+// }
+
+// .lightbox-image {
+//   max-width: 100%;
+//   max-height: 100%;
+//   object-fit: contain;
+//   transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+// }
+
+// .cursor-zoom-in {
+//   cursor: zoom-in;
+// }
+
+// .cursor-zoom-out {
+//   cursor: zoom-out;
+// }
+
+// .lightbox-close {
+//   position: absolute;
+//   top: 20px;
+//   right: 20px;
+//   background: rgba(0, 0, 0, 0.7);
+//   color: white;
+//   border: none;
+//   border-radius: 50%;
+//   width: 40px;
+//   height: 40px;
+//   font-size: 24px;
+//   cursor: pointer;
+//   z-index: 1001;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   transition: all 0.3s ease;
+// }
+
+// .lightbox-nav {
+//   position: absolute;
+//   top: 50%;
+//   transform: translateY(-50%);
+//   background-color: rgba(0, 0, 0, 0.7);
+//   color: white;
+//   border: none;
+//   padding: 15px;
+//   cursor: pointer;
+//   z-index: 1001;
+//   font-size: 24px;
+//   line-height: 1;
+//   transition: all 0.3s ease;
+// }
+
+// .lightbox-nav.prev {
+//   left: 20px;
+// }
+
+// .lightbox-nav.next {
+//   right: 20px;
+// }
+
+// @media (max-width: 768px) {
+//   .image-management-container {
+//     flex-direction: column;
+//   }
+  
+//   .thumbnails-section {
+//     width: 100%;
+//     margin-top: 1rem;
+//   }
+  
+//   .main-image-container {
+//     width: 100%;
+//     height: 300px;
+//   }
+// }
+// </style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//  <template>
+//     <div class="product-edit-container">
+//       <h1 class="text-2xl font-bold my-6 pt-2">Edit Product</h1>
+  
+//       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+//         <!-- Left Column: Product Details -->
+//         <div class="lg:col-span-2 space-y-6">
+//           <!-- Image Display Section -->
+//           <!-- <section class="panel">
+//             <h2 class="section-title">Product Images</h2>
+//             <div class="grid grid-cols-1 md:grid-cols-2 gap-6"> -->
+//               <!-- Main Image Display -->
+//               <!-- <div class="main-image-container">
+//                 <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors">
+//                   <img 
+//                     :src="mainImage" 
+//                     class="w-full h-full object-contain cursor-zoom-in"
+//                     @mouseover="zoomImage"
+//                     @mouseout="resetZoom"
+//                   >
+//                 </div>
+//               </div> -->
+  
+//               <!-- Thumbnail Grid -->
+//               <!-- <div class="thumbnail-grid">
+//                 <draggable 
+//                   v-model="product.images" 
+//                   group="images" 
+//                   item-key="id"
+//                   class="grid grid-cols-3 gap-3"
+//                 >
+//                   <template #item="{ element, index }">
+//                     <div class="thumbnail-container group relative">
+//                       <img 
+//                         :src="element" 
+//                         class="aspect-square object-cover rounded-lg border-2 cursor-pointer"
+//                         :class="index === 0 ? 'border-blue-500' : 'border-gray-200'"
+//                         @click="setMainImage(index)"
+//                       >
+//                       <button 
+//                         @click="removeImage(index)"
+//                         class="absolute top-1 right-1 bg-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+//                       >
+//                         <TrashIcon class="w-4 h-4 text-red-500" />
+//                       </button>
+//                     </div>
+//                   </template>
+//                 </draggable> -->
+                
+//                 <!-- Upload Box -->
+//                 <!-- <div 
+//                   class="upload-box aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors"
+//                   @click="triggerFileInput"
+//                 >
+//                   <div class="text-center">
+//                     <PlusCircleIcon class="w-8 h-8 text-gray-400 mx-auto" />
+//                     <p class="text-sm text-gray-500 mt-2">Upload Images</p>
+//                   </div>
+//                   <input 
+//                     ref="fileInput"
+//                     type="file" 
+//                     multiple 
+//                     accept="image/*" 
+//                     class="hidden" 
+//                     @change="handleImageUpload"
+//                   >
+//                 </div>
+//               </div>
+//             </div>
+//           </section> -->
+  
+//           <!-- Pricing Section -->
+//           <!-- <section class="panel">
+//             <h2 class="section-title">Pricing & Discount</h2>
+//             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+//               <div class="form-group">
+//                 <label>Original Price</label>
+//                 <input
+//                   v-model.number="originalPrice"
+//                   type="number"
+//                   step="0.01"
+//                   min="0"
+//                   class="form-input"
+//                   placeholder="0.00"
+//                 >
+//               </div>
+  
+//               <div class="form-group">
+//                 <label>Discount Percentage</label>
+//                 <input
+//                   v-model.number="currentDiscount"
+//                   type="number"
+//                   step="1"
+//                   min="0"
+//                   max="75"
+//                   class="form-input"
+//                   placeholder="0"
+//                 >
+//               </div>
+  
+//               <div class="form-group">
+//                 <label>Selling Price</label>
+//                 <input
+//                   :value="sellingPrice.toFixed(2)"
+//                   type="number"
+//                   step="0.01"
+//                   min="0"
+//                   class="form-input"
+//                   @input="updateSellingPrice($event.target.value)"
+//                   placeholder="0.00"
+//                 >
+//               </div>
+//             </div>
+//           </section> -->
+//           <section class="panel">
+//           <h2 class="section-title">Pricing & Discount</h2>
+//           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+//             <div class="form-group">
+//               <label>Selling Price</label>
+//               <input
+//                 :value="sellingPrice.toFixed(2)"
+//                 type="number"
+//                 step="0.01"
+//                 min="0"
+//                 class="form-input"
+//                 @input="updateSellingPrice($event.target.value)"
+//                 placeholder="0.00"
+//               />
+//             </div>
+
+//             <div class="form-group">
+//               <label>Original Price</label>
+//               <input
+//                 v-model.number="originalPrice"
+//                 type="number"
+//                 step="0.01"
+//                 min="0"
+//                 class="form-input"
+//                 placeholder="0.00"
+//               />
+//             </div>
+
+//             <div class="form-group">
+//               <label>Cost Price</label>
+//               <input
+//                 v-model.number="product.costPrice"
+//                 type="number"
+//                 step="0.01"
+//                 min="0"
+//                 class="form-input"
+//                 placeholder="0.00"
+//               />
+//             </div>
+
+//             <div class="form-group">
+//               <label>Discount Percentage</label>
+//               <input
+//                 v-model.number="currentDiscount"
+//                 type="number"
+//                 step="1"
+//                 min="0"
+//                 max="75"
+//                 class="form-input"
+//                 placeholder="0"
+//               />
+//             </div>
+
+//             <div class="form-group">
+//               <label>Start Date</label>
+//               <input type="date" class="form-input" />
+//             </div>
+
+//             <div class="form-group">
+//               <label>End Date</label>
+//               <input type="date" class="form-input" />
+//             </div>
+//           </div>
+//         </section>
+//           <!-- Product Details -->
+//           <section class="panel">
+//             <h2 class="section-title">Product Details</h2>
+//             <div class="space-y-4">
+//               <div class="form-group">
+//                 <label>Product Name</label>
+//                 <input 
+//                   v-model="product.name" 
+//                   class="form-input" 
+//                   placeholder="Enter product name"
+//                 >
+//               </div>
+  
+//               <div class="form-group">
+//                 <label>Description</label>
+//                 <textarea 
+//                   v-model="product.description" 
+//                   rows="4" 
+//                   class="form-input" 
+//                   placeholder="Enter product description"
+//                 ></textarea>
+//               </div>
+  
+//               <div class="grid grid-cols-2 gap-4">
+//                 <div class="form-group">
+//                   <label>SKU</label>
+//                   <input 
+//                     v-model="product.sku" 
+//                     class="form-input" 
+//                     placeholder="Enter SKU"
+//                   >
+//                 </div>
+  
+//                 <div class="form-group">
+//                   <label>Stock Quantity</label>
+//                   <input 
+//                     v-model.number="product.stock" 
+//                     type="number" 
+//                     class="form-input" 
+//                     placeholder="Enter stock"
+//                   >
+//                 </div>
+//               </div>
+//             </div>
+//           </section>
+  
+//           <!-- Inventory Management -->
+//           <section class="panel">
+//             <h2 class="section-title">Inventory Management</h2>
+//             <div class="space-y-4">
+//               <div class="flex items-center gap-2">
+//                 <input 
+//                   v-model="product.trackInventory" 
+//                   type="checkbox" 
+//                   id="trackInventory"
+//                   class="w-4 h-4"
+//                 >
+//                 <label for="trackInventory">Track inventory for this product</label>
+//               </div>
+  
+//               <div class="flex items-center gap-2">
+//                 <input 
+//                   v-model="product.continueWhenOutOfStock" 
+//                   type="checkbox" 
+//                   id="continueSelling"
+//                   class="w-4 h-4"
+//                 >
+//                 <label for="continueSelling">Continue selling when out of stock</label>
+//               </div>
+//             </div>
+//           </section>
+//         </div>
+  
+//         <!-- Right Column: Categories & Shipping -->
+//         <div class="space-y-6">
+//           <!-- Categories Section -->
+//           <!-- <section class="panel">
+//             <h2 class="section-title">Categories</h2>
+//             <div class="category-checkboxes space-y-2">
+//               <div 
+//                 v-for="category in categories" 
+//                 :key="category.name"
+//                 class="category-group"
+//               >
+//                 <div class="flex items-center gap-2 p-2 bg-gray-50 rounded">
+//                   <input
+//                     type="checkbox"
+//                     :id="`category-${category.name}`"
+//                     :checked="isCategorySelected(category)"
+//                     @change="toggleCategory(category, true)"
+//                     class="w-4 h-4"
+//                   >
+//                   <label :for="`category-${category.name}`" class="font-medium">
+//                     {{ category.name }}
+//                   </label>
+//                 </div>
+//                 <div v-if="category.children" class="subcategories ml-6 mt-1 space-y-2">
+//                   <div 
+//                     v-for="child in category.children"
+//                     :key="child"
+//                     class="flex items-center gap-2"
+//                   >
+//                     <input
+//                       type="checkbox"
+//                       :id="`subcategory-${child}`"
+//                       :checked="isSubcategorySelected(child)"
+//                       @change="toggleCategory({ name: child }, false)"
+//                       class="w-4 h-4"
+//                     >
+//                     <label :for="`subcategory-${child}`">{{ child }}</label>
+//                   </div>
+//                 </div>
+//               </div>
+//             </div>
+//           </section> -->
+//           <!-- Categories Section -->
+// <!-- Categories Section -->
+// <section class="panel">
+//   <h2 class="section-title">Categories</h2>
+//   <div class="category-checkboxes space-y-2">
+//     <div 
+//       v-for="category in categories" 
+//       :key="category.id"
+//       class="category-group"
+//     >
+//       <!-- Parent Category -->
+//       <div class="flex items-center gap-2 p-2 bg-gray-50 rounded">
+//         <input
+//           type="checkbox"
+//           :id="`category-${category.id}`"
+//           :checked="isCategorySelected(category)"
+//           @change="toggleCategory(category, true)"
+//           class="w-4 h-4"
+//         >
+//         <label :for="`category-${category.id}`" class="font-medium">
+//           {{ category.name }}
+//         </label>
+//       </div>
+
+//       <!-- Child Categories -->
+//       <div v-if="category.children && category.children.length" class="subcategories ml-6 mt-1 space-y-2">
+//         <div 
+//           v-for="child in category.children"
+//           :key="child.id"
+//           class="flex items-center gap-2"
+//         >
+//           <input
+//             type="checkbox"
+//             :id="`subcategory-${child.id}`"
+//             :checked="isSubcategorySelected(child)"
+//             @change="toggleCategory(child, false)"
+//             class="w-4 h-4"
+//           >
+//           <label :for="`subcategory-${child.id}`">{{ child.name }}</label>
+//         </div>
+//       </div>
+//     </div>
+//   </div>
+// </section>
+//           <!-- Shipping Details -->
+//           <section class="panel">
+//             <h2 class="section-title">Shipping Details</h2>
+//             <div class="space-y-4">
+//               <div class="form-group">
+//                 <label>Weight (kg)</label>
+//                 <input 
+//                   v-model.number="product.weight" 
+//                   type="number" 
+//                   step="0.1" 
+//                   class="form-input"
+//                   placeholder="0.0"
+//                 >
+//               </div>
+  
+//               <div class="grid grid-cols-3 gap-4">
+//                 <div class="form-group">
+//                   <label>Length</label>
+//                   <input 
+//                     v-model.number="product.dimensions.length" 
+//                     type="number" 
+//                     class="form-input"
+//                     placeholder="cm"
+//                   >
+//                 </div>
+//                 <div class="form-group">
+//                   <label>Width</label>
+//                   <input 
+//                     v-model.number="product.dimensions.width" 
+//                     type="number" 
+//                     class="form-input"
+//                     placeholder="cm"
+//                   >
+//                 </div>
+//                 <div class="form-group">
+//                   <label>Height</label>
+//                   <input 
+//                     v-model.number="product.dimensions.height" 
+//                     type="number" 
+//                     class="form-input"
+//                     placeholder="cm"
+//                   >
+//                 </div>
+//               </div>
+//             </div>
+//           </section>
+//         </div>
+//       </div>
+  
+//       <!-- Form Actions -->
+//       <div class="sticky bottom-0 bg-white py-4 border-t mt-8 flex justify-end gap-4">
+//         <button @click="cancelEdit" class="btn-secondary">
+//           Cancel
+//         </button>
+//         <button @click="saveProduct" class="btn-primary">
+//           Save Changes
+//         </button>
+//       </div>
+//     </div>
+//   </template>
+  
+
+  
+  
+//   <!-- <script setup>
+//   import { ref, computed, onMounted } from 'vue'
+//   import { useRoute, useRouter } from 'vue-router'
+//   import { TrashIcon, PlusCircleIcon } from '@heroicons/vue/24/outline'
+//   import draggable from 'vuedraggable'
+//   import api from '@/services/api'
+//   import { toast } from 'vue3-toastify'
+  
+//   const route = useRoute()
+//   const router = useRouter()
+  
+//   // Product data
+//   const product = ref({
+//     name: '',
+//     description: '',
+//     sku: '',
+//     price: 0, // Original price
+//     discountPercentage: 0,
+//     stock: 0,
+//     // images: [],
+//     trackInventory: true,
+//     continueWhenOutOfStock: false,
+//     weight: 0,
+//     dimensions: { length: 0, width: 0, height: 0 }
+//   })
+  
+//   // Categories data
+//   const categories = ref([
+//     {
+//       name: 'Electronics',
+//       children: ['Laptops', 'Smartphones', 'Wearables', 'Headphones', 'Cameras', 'Streaming Devices', 'Gaming Consoles', 'Printers', 'Speakers', 'Books & E-Readers'],
+//     },
+//     {
+//       name: 'Home Appliances',
+//       children: ['Kitchen Appliances', 'Air Purifiers', 'Vacuum Cleaners'],
+//     },
+//     {
+//       name: 'Furniture & Office Supplies',
+//       children: ['Ergonomic Chairs', 'Desks and Tables'],
+//     },
+//     {
+//       name: 'Fashion & Accessories',
+//       children: ['Clothing', 'Watches', 'Shoes', 'Bags'],
+//     },
+//     {
+//       name: 'Beauty & Health',
+//       children: ['Skin Care', 'Toothbrushes', 'Fitness Equipment'],
+//     },
+//     {
+//       name: 'Entertainment & Hobbies',
+//       children: ['Toys & Collectibles', 'Cutting Machines'],
+//     },
+//     {
+//       name: 'Outdoor & Travel',
+//       children: ['Camping Gear', 'Water Bottles', 'Pizza Ovens'],
+//     },
+//     {
+//       name: 'Smart Home & IoT',
+//       children: ['Video Doorbells', 'Security Cameras'],
+//     },
+//   ])
+  
+//   // Selected categories
+//   const selectedCategories = ref([])
+//   const selectedSubcategories = ref([])
+
+// //   const mainImage = ref('')
+
+  
+//   // Price handling
+//   const sellingPrice = ref(0)
+  
+//   // Computed properties for price calculations
+//   const originalPrice = computed({
+//     get: () => product.value.price,
+//     set: (value) => {
+//       const newPrice = Number(value) || 0
+//       product.value.price = newPrice
+//       // Update discount percentage based on new original price and current selling price
+//       if (newPrice > 0 && sellingPrice.value > 0) {
+//         const newDiscount = ((newPrice - sellingPrice.value) / newPrice) * 100
+//         product.value.discountPercentage = Math.min(Math.max(newDiscount, 0), 75)
+//       }
+//     }
+//   })
+  
+//   const currentDiscount = computed({
+//     get: () => product.value.discountPercentage,
+//     set: (value) => {
+//       const newDiscount = Math.min(Math.max(Number(value) || 0, 0), 75)
+//       product.value.discountPercentage = newDiscount
+//       // Update selling price based on new discount
+//       sellingPrice.value = originalPrice.value * (1 - (newDiscount / 100))
+//     }
+//   })
+  
+//   // Update selling price directly
+//   const updateSellingPrice = (newSellingPrice) => {
+//     const sp = Number(newSellingPrice) || 0
+//     sellingPrice.value = sp
+//     // Update discount percentage based on new selling price
+//     if (originalPrice.value > 0) {
+//       const newDiscount = ((originalPrice.value - sp) / originalPrice.value) * 100
+//       product.value.discountPercentage = Math.min(Math.max(newDiscount, 0), 75)
+//     }
+//   }
+  
+//   // Category handling
+// //   const isCategorySelected = (category) => {
+// //     return selectedCategories.value.includes(category.name) ||
+// //       (category.children && category.children.some(child => selectedSubcategories.value.includes(child)))
+// //   }
+  
+// //   const isSubcategorySelected = (subcategory) => {
+// //     return selectedSubcategories.value.includes(subcategory)
+// //   }
+// // Update the category checking logic
+// const isCategorySelected = (category) => {
+//   return selectedCategories.value.includes(category.name) || 
+//     category.children?.some(child => selectedSubcategories.value.includes(child))
+// }
+
+// const isSubcategorySelected = (subcategory) => {
+//   return selectedSubcategories.value.includes(subcategory)
+// }
+  
+//   const toggleCategory = (category, isParent) => {
+//     if (isParent) {
+//       // Toggle parent category and all children
+//       if (selectedCategories.value.includes(category.name)) {
+//         // Remove parent and all children
+//         selectedCategories.value = selectedCategories.value.filter(c => c !== category.name)
+//         if (category.children) {
+//           selectedSubcategories.value = selectedSubcategories.value.filter(
+//             sc => !category.children.includes(sc)
+//           )
+//         }
+//       } else {
+//         // Add parent and all children
+//         selectedCategories.value = [...selectedCategories.value, category.name]
+//         if (category.children) {
+//           selectedSubcategories.value = [
+//             ...selectedSubcategories.value,
+//             ...category.children.filter(child => !selectedSubcategories.value.includes(child))
+//           ]
+//         }
+//       }
+//     } else {
+//       // Toggle child category
+//       if (selectedSubcategories.value.includes(category.name)) {
+//         selectedSubcategories.value = selectedSubcategories.value.filter(
+//           sc => sc !== category.name
+//         )
+//         // Check if parent should be deselected
+//         const parent = categories.value.find(cat => 
+//           cat.children?.includes(category.name))
+//         if (parent && isCategorySelected(parent)) {
+//           selectedCategories.value = selectedCategories.value.filter(
+//             c => c !== parent.name
+//           )
+//         }
+//       } else {
+//         selectedSubcategories.value = [...selectedSubcategories.value, category.name]
+//         // Check if parent should be selected
+//         const parent = categories.value.find(cat => 
+//           cat.children?.includes(category.name))
+//         if (parent && !selectedCategories.value.includes(parent.name)) {
+//           selectedCategories.value = [...selectedCategories.value, parent.name]
+//         }
+//       }
+//     }
+//   }
+  
+//   // Load product data
+//   onMounted(async () => {
+//     try {
+//       const response = await api.get(`/admin/products/${route.params.id}`)
+//       const productData = response.data
+//       console.log('Product data from backend:', productData);
+
+      
+//       // Update product data
+//       product.value = {
+//         ...product.value,
+//         ...productData,
+//         price: Number(productData.price) || 0,
+//         discountPercentage: Number(productData.discountPercentage) || 0,
+//         dimensions: productData.dimensions || { length: 0, width: 0, height: 0 }
+//       }
+  
+//       // Calculate initial selling price
+//       sellingPrice.value = product.value.price * (1 - (product.value.discountPercentage / 100))
+  
+//       // Load categories
+//     //   const loadedCategories = productData.categories || []
+//     //   selectedCategories.value = loadedCategories
+//     //     .filter(cat => categories.value.some(c => c.name === cat.name && !c.children?.includes(cat.name)))
+//     //     .map(c => c.name)
+        
+//     //   selectedSubcategories.value = loadedCategories
+//     //     .filter(cat => categories.value.some(c => c.children?.includes(cat.name)))
+//     //     .map(c => c.name)
+//     // Load categories - REVISED
+//     const loadedCategories = productData.categories || []
+//     selectedCategories.value = loadedCategories
+//       .filter(cat => categories.value.some(c => c.name === cat.name))
+//       .map(c => c.name)
+      
+//     selectedSubcategories.value = loadedCategories
+//       .filter(cat => categories.value.some(c => 
+//         c.children?.includes(cat.name)
+//       ))
+//       .map(c => c.name)
+  
+//       // Load images
+//     //   if (product.value.images.length > 0) {
+//     //     mainImage.value = product.value.images[0]
+//     //   }
+//     } catch (error) {
+//       toast.error('Failed to load product')
+//     //   router.push('/admin/products')
+//     }
+//   })
+  
+//   // Save product
+// //   const saveProduct = async () => {
+// //     try {
+// //       const payload = {
+// //         ...product.value,
+// //         categoryIds: [
+// //           ...selectedCategories.value,
+// //           ...selectedSubcategories.value
+// //         ].map(name => 
+// //           categories.value.find(c => c.name === name)?.id || 
+// //           categories.value.flatMap(c => c.children).indexOf(name) + 1
+// //         )
+// //       }
+  
+// //       await api.put(`/admin/products/${route.params.id}`, payload)
+// //       toast.success('Product updated successfully')
+// //       router.push('/admin/products')
+// //     } catch (error) {
+// //       toast.error(error.response?.data?.error || 'Failed to update product')
+// //     }
+// //   }
+// // const saveProduct = async () => {
+// //   try {
+// //     // Validate categories
+// //     const categoryIds = [
+// //       ...selectedCategories.value,
+// //       ...selectedSubcategories.value
+// //     ].map(name => {
+// //       // Find the category by name
+// //       const category = categories.value.find(c => c.name === name);
+// //       if (!category) {
+// //         throw new Error(`Category "${name}" not found`);
+// //       }
+// //       return category.id;
+// //     });
+
+// //     // Prepare payload
+// //     const payload = {
+// //       ...product.value,
+// //       categoryIds
+// //     };
+
+// //     // Save product
+// //     await api.put(`/admin/products/${route.params.id}`, payload);
+// //     toast.success('Product updated successfully');
+// //     router.push('/admin/products');
+// //   } catch (error) {
+// //     toast.error(error.response?.data?.error || 'Failed to update product');
+// //   }
+// // };
+// // const saveProduct = async () => {
+// //   try {
+// //     console.log('Starting product update...');
+
+// //     // Validate categories
+// //     const categoryIds = [
+// //       ...selectedCategories.value,
+// //       ...selectedSubcategories.value
+// //     ].map(name => {
+// //       // Find the category by name
+// //       const category = categories.value.find(c => c.name === name);
+// //       if (!category) {
+// //         throw new Error(`Category "${name}" not found`);
+// //       }
+// //       return category.id;
+// //     });
+
+// //     console.log('Category IDs:', categoryIds);
+
+// //     // Prepare payload
+// //     const payload = {
+// //       ...product.value,
+// //       categoryIds
+// //     };
+
+// //     console.log('Payload:', payload);
+
+// //     // Save product
+// //     const response = await api.put(`/admin/products/${route.params.id}`, payload);
+// //     console.log('Update response:', response.data);
+
+// //     toast.success('Product updated successfully');
+// //     // router.push('/admin/products');
+// //   } catch (error) {
+// //     console.error('Error updating product:', error);
+
+// //     if (error.response) {
+// //       // Backend error
+// //       console.error('Backend error details:', error.response.data);
+// //       toast.error(error.response.data.error || 'Failed to update product');
+// //     } else if (error.request) {
+// //       // No response from backend
+// //       console.error('No response from backend:', error.request);
+// //       toast.error('Network error: Could not connect to the server');
+// //     } else {
+// //       // Frontend error
+// //       console.error('Frontend error:', error.message);
+// //       toast.error(error.message || 'Failed to update product');
+// //     }
+// //   }
+// // };
+// const saveProduct = async () => {
+//   try {
+//     console.log('Starting product update...');
+
+//     // Validate categories
+//     const categoryIds = [
+//       ...selectedCategories.value,
+//       ...selectedSubcategories.value
+//     ].map(name => {
+//       // Find the category by name
+//       const category = categories.value.find(c => c.name === name);
+//       if (!category) {
+//         throw new Error(`Category "${name}" not found. Please ensure it exists in the categories list.`);
+//       }
+//       return category.id;
+//     });
+
+//     console.log('Category IDs:', categoryIds);
+
+//     // Prepare payload
+//     const payload = {
+//       ...product.value,
+//       categoryIds
+//     };
+
+//     console.log('Payload:', payload);
+
+//     // Save product
+//     const response = await api.put(`/admin/products/${route.params.id}`, payload);
+//     console.log('Update response:', response.data);
+
+//     toast.success('Product updated successfully');
+//     router.push('/admin/products');
+//   } catch (error) {
+//     console.error('Error updating product:', error);
+
+//     if (error.response) {
+//       // Backend error
+//       console.error('Backend error details:', error.response.data);
+//       toast.error(error.response.data.error || 'Failed to update product');
+//     } else if (error.request) {
+//       // No response from backend
+//       console.error('No response from backend:', error.request);
+//       toast.error('Network error: Could not connect to the server');
+//     } else {
+//       // Frontend error
+//       console.error('Frontend error:', error.message);
+//       toast.error(error.message || 'Failed to update product');
+//     }
+//   }
+// };
+  
+//   const cancelEdit = () => router.push('/admin/products')
+//   </script> -->
+//   <script setup>
+// import { ref, computed, onMounted } from 'vue'
+// import { useRoute, useRouter } from 'vue-router'
+// import { TrashIcon, PlusCircleIcon } from '@heroicons/vue/24/outline'
+// import draggable from 'vuedraggable'
+// import api from '@/services/api'
+// import { toast } from 'vue3-toastify'
+
+// const route = useRoute()
+// const router = useRouter()
+
+// // Product data
+// const product = ref({
+//   name: '',
+//   description: '',
+//   sku: '',
+//   price: 0, // Original price
+//   discountPercentage: 0,
+//   costPrice: 0, // Initialize costPrice to 0
+//   stock: 0,
+//   // images: [],
+//   trackInventory: true,
+//   continueWhenOutOfStock: false,
+//   weight: 0,
+//   dimensions: { length: 0, width: 0, height: 0 }
+// })
+
+// // Categories data
+// const categories = ref([
+//   {
+//     id: 1,
+//     name: 'Electronics',
+//     isMain: true,
+//     children: [
+//       { id: 101, name: 'Laptops' },
+//       { id: 102, name: 'Smartphones' },
+//       { id: 103, name: 'Wearables' },
+//       { id: 104, name: 'Headphones' },
+//       { id: 105, name: 'Cameras' },
+//       { id: 106, name: 'Streaming Devices' },
+//       { id: 107, name: 'Gaming Consoles' },
+//       { id: 108, name: 'Printers' },
+//       { id: 109, name: 'Speakers' },
+//       { id: 110, name: 'Books & E-Readers' }
+//     ]
+//   },
+//   {
+//     id: 2,
+//     name: 'Home Appliances',
+//     isMain: true,
+//     children: [
+//       { id: 201, name: 'Kitchen Appliances' },
+//       { id: 202, name: 'Air Purifiers' },
+//       { id: 203, name: 'Vacuum Cleaners' }
+//     ]
+//   },
+//   {
+//     id: 3,
+//     name: 'Furniture & Office Supplies',
+//     isMain: true,
+//     children: [
+//       { id: 301, name: 'Ergonomic Chairs' },
+//       { id: 302, name: 'Desks and Tables' }
+//     ]
+//   },
+//   {
+//     id: 4,
+//     name: 'Fashion & Accessories',
+//     isMain: true,
+//     children: [
+//       { id: 401, name: 'Clothing' },
+//       { id: 402, name: 'Watches' },
+//       { id: 403, name: 'Shoes' },
+//       { id: 404, name: 'Bags' }
+//     ]
+//   },
+//   {
+//     id: 5,
+//     name: 'Beauty & Health',
+//     isMain: true,
+//     children: [
+//       { id: 501, name: 'Skin Care' },
+//       { id: 502, name: 'Toothbrushes' },
+//       { id: 503, name: 'Fitness Equipment' }
+//     ]
+//   },
+//   {
+//     id: 6,
+//     name: 'Entertainment & Hobbies',
+//     isMain: true,
+//     children: [
+//       { id: 601, name: 'Toys & Collectibles' },
+//       { id: 602, name: 'Cutting Machines' }
+//     ]
+//   },
+//   {
+//     id: 7,
+//     name: 'Outdoor & Travel',
+//     isMain: true,
+//     children: [
+//       { id: 701, name: 'Camping Gear' },
+//       { id: 702, name: 'Water Bottles' },
+//       { id: 703, name: 'Pizza Ovens' }
+//     ]
+//   },
+//   {
+//     id: 8,
+//     name: 'Smart Home & IoT',
+//     isMain: true,
+//     children: [
+//       { id: 801, name: 'Video Doorbells' },
+//       { id: 802, name: 'Security Cameras' }
+//     ]
+//   }
+// ]);
+
+// // Selected categories
+// const selectedCategories = ref([])
+// const selectedSubcategories = ref([])
+
+// // Price handling
+// const sellingPrice = ref(0)
+
+// // Computed properties for price calculations
+// const originalPrice = computed({
+//   get: () => product.value.price,
+//   set: (value) => {
+//     const newPrice = Number(value) || 0
+//     product.value.price = newPrice
+//     // Update discount percentage based on new original price and current selling price
+//     if (newPrice > 0 && sellingPrice.value > 0) {
+//       const newDiscount = ((newPrice - sellingPrice.value) / newPrice) * 100
+//       product.value.discountPercentage = Math.min(Math.max(newDiscount, 0), 75)
+//     }
+//   }
+// })
+
+
+// const currentDiscount = computed({
+//   get: () => Math.round(product.value.discountPercentage),
+//   set: (value) => {
+//     const roundedValue = Math.min(Math.max(Math.round(Number(value) || 0), 0), 75);
+//     product.value.discountPercentage = roundedValue; // Ensure the product value is rounded
+//     sellingPrice.value = originalPrice.value * (1 - (roundedValue / 100));
+//   }
+// });
+
+// const updateSellingPrice = (newSellingPrice) => {
+//   const sp = Number(newSellingPrice) || 0;
+//   sellingPrice.value = sp;
+//   if (originalPrice.value > 0) {
+//     const newDiscount = Math.min(Math.max(Math.round(((originalPrice.value - sp) / originalPrice.value) * 100), 0), 75);
+//     product.value.discountPercentage = newDiscount; // Ensure the product value is rounded
+//   }
+// };
+
+// // Category handling
+
+// // Check if a category is selected
+// const isCategorySelected = (category) => {
+//   return selectedCategories.value.some(c => c.id === category.id);
+// };
+
+// // Check if a subcategory is selected
+// const isSubcategorySelected = (subcategory) => {
+//   return selectedSubcategories.value.some(c => c.id === subcategory.id);
+// };
+
+// // Toggle category or subcategory
+// const toggleCategory = (category, isParent) => {
+//   if (isParent) {
+//     // Handle parent category
+//     const exists = selectedCategories.value.some(c => c.id === category.id);
+//     if (exists) {
+//       // Remove parent and all its children
+//       selectedCategories.value = selectedCategories.value.filter(c => c.id !== category.id);
+//       selectedSubcategories.value = selectedSubcategories.value.filter(
+//         sc => !category.children.some(child => child.id === sc.id)
+//       );
+//     } else {
+//       // Add parent and all its children
+//       selectedCategories.value = [...selectedCategories.value, category];
+//       selectedSubcategories.value = [
+//         ...selectedSubcategories.value,
+//         ...category.children.filter(child => 
+//           !selectedSubcategories.value.some(sc => sc.id === child.id)
+//         )
+//       ];
+//     }
+//   } else {
+//     // Handle subcategory
+//     const exists = selectedSubcategories.value.some(c => c.id === category.id);
+//     if (exists) {
+//       // Remove subcategory
+//       selectedSubcategories.value = selectedSubcategories.value.filter(c => c.id !== category.id);
+//       // Check if parent should be deselected
+//       const parent = categories.value.find(c => c.children?.some(ch => ch.id === category.id));
+//       if (parent && !parent.children.some(ch => selectedSubcategories.value.some(sc => sc.id === ch.id))) {
+//         selectedCategories.value = selectedCategories.value.filter(c => c.id !== parent.id);
+//       }
+//     } else {
+//       // Add subcategory
+//       selectedSubcategories.value = [...selectedSubcategories.value, category];
+//       // Ensure parent is selected
+//       const parent = categories.value.find(c => c.children?.some(ch => ch.id === category.id));
+//       if (parent && !selectedCategories.value.some(c => c.id === parent.id)) {
+//         selectedCategories.value = [...selectedCategories.value, parent];
+//       }
+//     }
+//   }
+// };
+// // Load product data
+// onMounted(async () => {
+//   try {
+//     // Load categories
+//     const catResponse = await api.get('/products/categories');
+//     console.log('Fetched categories:', catResponse.data); // Debug log
+//     categories.value = catResponse.data;
+
+//     // Load product data
+//     const response = await api.get(`/admin/products/${route.params.id}`);
+//     const productData = response.data;
+
+//     // Update product data
+//     product.value = {
+//       ...product.value,
+//       ...productData,
+//       price: Number(productData.price) || 0,
+//       discountPercentage: Number(productData.discountPercentage) || 0,
+//       costPrice: Number(productData.costPrice) || 0, // Add costPrice here
+//       dimensions: productData.dimensions || { length: 0, width: 0, height: 0 }
+//     };
+
+//     // Set selected categories
+//     selectedCategories.value = productData.categories
+//       .filter(cat => cat.isMainCategory)
+//       .map(cat => ({
+//         id: cat.id,
+//         name: cat.name,
+//         isMain: cat.isMainCategory
+//       }));
+
+//     selectedSubcategories.value = productData.categories
+//       .filter(cat => !cat.isMainCategory)
+//       .map(cat => ({
+//         id: cat.id,
+//         name: cat.name,
+//         isMain: cat.isMainCategory
+//       }));
+
+//     // Calculate initial selling price
+//     sellingPrice.value = product.value.price * (1 - (product.value.discountPercentage / 100));
+
+//   } catch (error) {
+//     console.error('Error loading product:', error);
+//     toast.error('Failed to load product');
+//   }
+// });
+// // Save product
+// const saveProduct = async () => {
+//   try {
+//     const payload = {
+//       ...product.value,
+//       categoryIds: [
+//         ...selectedCategories.value.map(c => c.id),
+//         ...selectedSubcategories.value.map(c => c.id)
+//       ]
+//     };
+
+//     await api.put(`/admin/products/${route.params.id}`, payload);
+//     toast.success('Product updated successfully');
+//   } catch (error) {
+//     toast.error(error.response?.data?.error || 'Failed to update product');
+//   }
+// };
+// const cancelEdit = () => router.push('/admin/manage-products')
+// </script>
+  
+//   <style scoped>
+//   .product-edit-container {
+//     max-width: 1300px;
+//     margin: 0 auto;
+//     padding-left: 3rem;
+//     padding-right: 3rem;
+//   }
+  
+//   .panel {
+//     @apply bg-white rounded-lg p-6 shadow-sm border border-gray-200;
+//   }
+  
+//   .section-title {
+//     @apply text-lg font-semibold mb-4 pb-2 border-b border-gray-200;
+//   }
+  
+//   .form-input {
+//     @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+//   }
+  
+//   .btn-primary {
+//     @apply px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors;
+//   }
+  
+//   .btn-secondary {
+//     @apply px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors;
+//   }
+  
+//   .main-image-container {
+//     @apply relative aspect-square bg-gray-100 rounded-lg overflow-hidden;
+//   }
+  
+//   .thumbnail-container {
+//     @apply relative aspect-square;
+//   }
+  
+//   .upload-box {
+//     @apply p-4 text-center cursor-pointer transition-colors;
+//   }
+  
+//   .category-checkboxes {
+//     @apply space-y-2 p-2;
+//   }
+  
+//   .category-group {
+//     @apply space-y-1;
+//   }
+//   </style> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// <!-- components/AdminOrderManagement.vue -->
+// <template>
+//   <div class="admin-order-management">
+//     <h1>Order Management</h1>
+
+//     <div class="filters">
+//       <!-- Checkbox to filter out Pending orders -->
+//       <label>
+//         <input 
+//           type="checkbox" 
+//           v-model="hidePendingOrders" 
+//         />
+//         Hide Pending Orders
+//       </label>
+
+//       <!-- Checkbox to filter out Delivered orders -->
+//       <label>
+//         <input 
+//           type="checkbox" 
+//           v-model="hideDeliveredOrders" 
+//         />
+//         Hide Delivered Orders
+//       </label>
+
+//       <!-- Status filter dropdown -->
+//       <select v-model="statusFilter">
+//         <option value="">All Statuses</option>
+//         <option v-for="status in orderStatuses" :key="status">
+//           {{ status }}
+//         </option>
+//       </select>
+
+//       <!-- Search input -->
+//       <input 
+//         v-model="searchQuery" 
+//         placeholder="Search by Order ID or Username"
+//       />
+//     </div>
+
+//     <!-- Loading state -->
+//     <div v-if="orderManagementStore.loading" class="loading">
+//       Loading orders...
+//     </div>
+
+//     <!-- Error state -->
+//     <div v-else-if="orderManagementStore.error" class="error">
+//       {{ orderManagementStore.error }}
+//     </div>
+
+//     <!-- Orders table -->
+//     <table v-else-if="orderManagementStore.orders?.length" class="orders-table">
+//       <thead>
+//         <tr>
+//           <th>Order ID</th>
+//           <th>User</th>
+//           <th>Total Amount</th>
+//           <th>Status</th>
+//           <th>Actions</th>
+//         </tr>
+//       </thead>
+//       <tbody>
+//         <tr 
+//           v-for="order in filteredOrders" 
+//           :key="order.id"
+//           @click="selectedOrder = order"
+//         >
+//           <td>{{ order.id }}</td>
+//           <td>{{ order.User?.username || 'Unknown User' }}</td>
+//           <td>${{ order.totalAmount.toFixed(2) }}</td>
+//           <td>
+//             <span :class="getStatusClass(order.status)">
+//               {{ order.status }}
+//             </span>
+//           </td>
+//           <td>
+//             <div class="action-buttons">
+//               <template v-if="order.status === 'Processing'">
+//                 <button @click.stop="updateToShipping(order)">Update to Shipping</button>
+//                 <input 
+//                   type="date" 
+//                   v-model="shippingDates[order.id]" 
+//                   placeholder="Estimated Shipping Date"
+//                   @click.stop
+//                 />
+//               </template>
+//               <template v-if="order.status === 'Shipping'">
+//                 <button @click.stop="updateToDelivering(order)">Update to Delivering</button>
+//                 <input 
+//                   type="datetime-local" 
+//                   v-model="deliveryDates[order.id]" 
+//                   placeholder="Exact Delivery Time"
+//                   @click.stop
+//                 />
+//               </template>
+//               <template v-if="order.status === 'Delivering'">
+//                 <button @click.stop="updateToDelivered(order)">Update to Delivered</button>
+//               </template>
+//             </div>
+//           </td>
+//         </tr>
+//       </tbody>
+//     </table>
+
+//     <!-- No orders available -->
+//     <div v-else>
+//       <p>No orders available to display.</p>
+//     </div>
+
+//     <!-- Order detail modal -->
+//     <OrderDetailModal 
+//       v-if="selectedOrder"
+//       :order="selectedOrder"
+//       @close="selectedOrder = null"
+//     />
+//   </div>
+// </template>
+
+// <script setup>
+// import { ref, computed, onMounted, onUnmounted } from 'vue';
+// import { useOrderManagementStore } from '@/stores/orderManagementStore';
+// import OrderDetailModal from './OrderDetailModal.vue';
+
+// const orderManagementStore = useOrderManagementStore();
+// const selectedOrder = ref(null);
+// const statusFilter = ref('');
+// const searchQuery = ref('');
+// const shippingDates = ref({});
+// const deliveryDates = ref({});
+// const hidePendingOrders = ref(true); // Checkbox to hide Pending orders (checked by default)
+// const hideDeliveredOrders = ref(true); // Checkbox to hide Delivered orders (checked by default)
+
+// const orderStatuses = [
+//   'Pending', 
+//   'Processing', 
+//   'Shipping', 
+//   'Delivering', 
+//   'Delivered', 
+//   'Cancelled'
+// ];
+
+// // Computed property to filter orders
+// const filteredOrders = computed(() => {
+//   const orders = orderManagementStore.orders || []; // Default to empty array
+//   return orders.filter(order => {
+//     const matchStatus = !statusFilter.value || 
+//       order.status === statusFilter.value;
+
+//     const matchSearch = !searchQuery.value || 
+//       order.id.toString().includes(searchQuery.value) ||
+//       order.User?.username?.toLowerCase().includes(searchQuery.value.toLowerCase());
+
+//     // Exclude Pending orders if checkbox is checked
+//     const excludePending = hidePendingOrders.value ? order.status !== 'Pending' : true;
+
+//     // Exclude Delivered orders if checkbox is checked
+//     const excludeDelivered = hideDeliveredOrders.value ? order.status !== 'Delivered' : true;
+
+//     return matchStatus && matchSearch && excludePending && excludeDelivered;
+//   });
+// });
+
+// // Function to get status class for styling
+// function getStatusClass(status) {
+//   const statusClasses = {
+//     'Pending': 'status-pending',
+//     'Processing': 'status-processing',
+//     'Shipping': 'status-shipping',
+//     'Delivering': 'status-delivering',
+//     'Delivered': 'status-delivered',
+//     'Cancelled': 'status-cancelled'
+//   };
+//   return statusClasses[status] || '';
+// }
+
+// // Function to update order status to Shipping
+// const updateToShipping = async (order) => {
+//   const shippingDate = shippingDates.value[order.id];
+//   if (!shippingDate) {
+//     alert('Please select a shipping date');
+//     return;
+//   }
+//   try {
+//     await orderManagementStore.updateOrderStatus(order.id, 'Shipping', shippingDate);
+//   } catch (error) {
+//     alert('Failed to update order status');
+//     console.error('Error updating to Shipping:', error);
+//   }
+// };
+
+// // Function to update order status to Delivering
+// const updateToDelivering = async (order) => {
+//   const deliveryDateTime = deliveryDates.value[order.id];
+//   if (!deliveryDateTime) {
+//     alert('Please select a delivery date and time');
+//     return;
+//   }
+//   try {
+//     await orderManagementStore.updateOrderStatus(order.id, 'Delivering', deliveryDateTime);
+//   } catch (error) {
+//     alert('Failed to update order status');
+//     console.error('Error updating to Delivering:', error);
+//   }
+// };
+
+// // Function to update order status to Delivered
+// const updateToDelivered = async (order) => {
+//   try {
+//     await orderManagementStore.updateOrderStatus(order.id, 'Delivered');
+//   } catch (error) {
+//     alert('Failed to update order status');
+//     console.error('Error updating to Delivered:', error);
+//   }
+// };
+
+// // Fetch orders and initialize WebSocket on component mount
+// onMounted(() => {
+//   orderManagementStore.fetchOrders();
+//   orderManagementStore.initializeWebSocket();
+// });
+
+// // Close WebSocket on component unmount
+// onUnmounted(() => {
+//   if (orderManagementStore.socket) {
+//     orderManagementStore.socket.close();
+//   }
+// });
+// </script>
+
+// <style scoped>
+// .admin-order-management {
+//   padding: 20px;
+// }
+
+// .filters {
+//   display: flex;
+//   gap: 10px;
+//   margin-bottom: 20px;
+//   align-items: center;
+// }
+
+// .orders-table {
+//   width: 100%;
+//   border-collapse: collapse;
+// }
+
+// .orders-table th, 
+// .orders-table td {
+//   border: 1px solid #ddd;
+//   padding: 8px;
+//   text-align: left;
+// }
+
+// .action-buttons {
+//   display: flex;
+//   gap: 5px;
+// }
+
+// /* Status Color Classes */
+// .status-pending { color: orange; }
+// .status-processing { color: blue; }
+// .status-shipping { color: brown; }
+// .status-delivering { color: rgb(77, 219, 77); }
+// .status-delivered { color: teal; }
+// .status-cancelled { color: red; }
 // </style>

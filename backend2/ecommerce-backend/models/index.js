@@ -109,11 +109,6 @@ db.Order.hasMany(db.VerifiedPurchase, { foreignKey: 'orderId' });
 db.VerifiedPurchase.belongsTo(db.Order, { foreignKey: 'orderId' });
 
 // Image associations
-db.Image.belongsTo(db.User, {
-  foreignKey: 'userId',
-  as: 'imageUser', // Changed alias to 'imageUser' to avoid conflict
-  constraints: false
-});
 
 db.Image.belongsTo(db.Product, {
   foreignKey: 'productId',
@@ -121,16 +116,25 @@ db.Image.belongsTo(db.Product, {
   constraints: false
 });
 
-db.User.hasOne(db.Image, {
-  foreignKey: 'userId',
-  as: 'avatar',
-  scope: { type: 'avatar' }
-});
+
 
 db.Product.hasMany(db.Image, {
   foreignKey: 'productId',
   as: 'productImages', // Changed alias to 'productImages' to avoid conflict
-  scope: { type: 'product' }
+  // scope: { type: 'product' }
+});
+
+
+// Add this association after other associations
+db.Product.belongsTo(db.User, {
+  foreignKey: 'sellerId',
+  as: 'seller'
+  // as: 'productSeller'
+});
+
+db.User.hasMany(db.Product, {
+  foreignKey: 'sellerId',
+  as: 'products'
 });
 
 module.exports = db;

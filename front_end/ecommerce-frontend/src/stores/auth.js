@@ -18,7 +18,9 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => state.authStatus === 'authenticated' && !!state.user,
     isAdmin: (state) => state.user && (state.user.role === 'admin' || state.user.role === 'superadmin'),
-    isSuperAdmin: (state) => state.user && state.user.role === 'superadmin',
+    isSuperAdmin: (state) => state.user?.role === 'superadmin',
+    isSeller: (state) => state.user?.role === 'seller',
+
   },
 
   actions: {
@@ -168,6 +170,21 @@ async checkAuth() {
         };
       } catch (error) {
         console.error('Error fetching user data:', error);
+        throw error;
+      }
+    },
+    async registerSeller(sellerData) {
+      try {
+        console.log('Registering seller:', sellerData.username);
+        const response = await api.post('/auth/register-seller', sellerData);
+        console.log('Seller registration response:', response.data);
+
+        const { user } = response.data; // Tokens are handled via cookies
+        this.setAuth(user);
+
+        return response;
+      } catch (error) {
+        console.error('Seller registration error:', error);
         throw error;
       }
     },

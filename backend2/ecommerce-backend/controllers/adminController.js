@@ -1,13 +1,18 @@
 // controller/adminController.js
 
 const db = require('../config/db');
-const { Product, Order, Category, User, OrderItems, VerifiedPurchase } = require('../models');
+const { Product, Order, Category, User, OrderItems, VerifiedPurchase, Image, ProductCategory } = require('../models');
 const { Op } = require('sequelize');
 const WebSocket = require('ws');
 const { sendEmail, sendOrderConfirmationEmail, sendDeliveryNotificationEmail } = require('../utils/emailService');
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
+const axios = require('axios');
+const FormData = require('form-data');
+// const { sequelize } = require('../config/db');
+const { sequelize } = require('../models'); 
+
 
 const wss = new WebSocket.Server({ port: 8080 }); // Adjust port as needed
 
@@ -120,6 +125,7 @@ exports.getAllProducts = async (req, res) => {
 };
 
 // Add new product
+
 exports.addProduct = async (req, res) => {
   try {
     const newProduct = await Product.create(req.body);
@@ -131,25 +137,86 @@ exports.addProduct = async (req, res) => {
 };
 
 // Edit product
-exports.editProduct = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const product = await Product.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    await product.update(req.body);
-    res.json(product);
 
-    // Broadcast stock update if stock has changed
-    if (req.body.stock !== undefined) {
-      broadcastStockUpdate(id, req.body.stock);
+
+exports.editProduct = async (req, res) => {
+  const {id} = req.params;
+  const t = await sequelize.transaction();
+
+  try {
+    // Update core product fields
+    await Product.update(req.body, {
+      where: {id},
+      transaction: t
+    });
+
+    // Handle category updates
+    if (req.body.categoryIds) {
+      await ProductCategory.destroy({
+        where: {productId: id},
+        transaction: t
+      });
+      
+      await ProductCategory.bulkCreate(
+        req.body.categoryIds.map(categoryId => ({
+          productId: id,
+          categoryId
+        })),
+        {transaction: t}
+      );
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to edit product' });
+
+
+    //Handle images 
+    if (req.body.images?.length) {
+      const existingImages = req.body.images.filter(img => img.id);
+      const newImages = req.body.images.filter(img => !img.id);
+
+      // Update existing images
+      await Promise.all(
+        existingImages.map((img, index) =>
+          Image.update(
+            {order: index},
+            {
+              where: { id: img.id, productId: id},
+              transaction: t
+            }
+          )
+        )
+      );
+
+      // Create new images
+      await Image.bulkCreate(
+        newImages.map((img, index) => ({
+          url: img.url,
+          thubnail: img.thumbnail,
+          productId: id,
+          order: existingImages.length + index
+        })),
+        {transaction: t}
+      );
+    }
+    
+    await t.commit();
+
+    // Fetch updated product with images
+    const updatedProduct = await Product.findByPk(id, {
+      include: [
+        {model: Image, as: 'productImages', order: [['order', 'ASC']]}
+      ]
+    });
+
+    res.json(updatedProduct);
+  } catch(err) {
+    await t.rollback();
+    console.error('Edit product error:', err);
+    res.status(500).json({
+      error: 'Failed to edit product',
+      details: err.message
+    });
   }
 };
+
 
 // Delete product
 exports.deleteProduct = async (req, res) => {
@@ -243,22 +310,24 @@ exports.getLowStockAlerts = async (req, res) => {
 };
 
 // Update stock
+
 exports.updateStock = async (req, res) => {
   const { id } = req.params;
-  const { stockChange } = req.body;
+  const { stock } = req.body;
+
   try {
     const product = await Product.findByPk(id);
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    const newStock = product.stock + stockChange;
-    await product.update({ stock: newStock });
-    res.json(product);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    // Broadcast the stock update
-    broadcastStockUpdate(id, newStock);
+    // Validate stock value
+    if (typeof stock !== 'number' || stock < 0) {
+      return res.status(400).json({ error: 'Invalid stock value' });
+    }
+
+    await product.update({ stock });
+    res.json(product);
   } catch (err) {
-    console.error(err);
+    console.error('Stock update error:', err);
     res.status(500).json({ error: 'Failed to update stock' });
   }
 };
@@ -712,6 +781,241 @@ const broadcastOrderStatusUpdate = (orderId, status, estimatedDate) => {
       }));
     }
   });
+};
+
+// Get single product by ID
+
+
+exports.getProductById = async (req, res) => {
+  try {
+    const product = await Product.findByPk(req.params.id, {
+      include: [
+        {
+          model: Category,
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'isMainCategory'],
+          as: 'categories'
+        },
+        {
+          model: Image,
+          as: 'productImages',
+          attributes: ['id', 'url', 'thumbnail', 'order'], // Include thumbnail
+          order: [['order', 'ASC']]
+        }
+      ]
+    });
+
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+
+    const productData = product.toJSON();
+    
+    // Format the response for frontend expectations
+    const response = {
+      ...productData,
+      sellingPrice: productData.price * (1 - (productData.discountPercentage / 100)),
+      mainImage: { url: productData.imageUrl }, // Map imageUrl to mainImage
+      images: productData.productImages || [] // Map productImages to images
+    };
+
+    res.json(response);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch product' });
+  }
+};
+
+exports.uploadMainImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    // Validate file
+    if (!file) return res.status(400).json({ error: 'No image uploaded' });
+    if (!file.mimetype.startsWith('image/')) return res.status(400).json({ error: 'Invalid file type' });
+    if (file.size > 5 * 1024 * 1024) return res.status(400).json({ error: 'File size exceeds 5MB' });
+
+    // Upload to ImgBB
+    const imgBBFormData = new FormData();
+    imgBBFormData.append('image', file.buffer.toString('base64'));
+    const imgBBResponse = await axios.post(`https://api.imgbb.com/1/upload?key=${process.env.NEW_IMGBB_API_KEY}`, imgBBFormData, {
+      headers: imgBBFormData.getHeaders(),
+      params: { resize: '250,250,cover' }
+    });
+
+    const imageUrl = imgBBResponse.data.data.url;
+
+    // Update product
+    await Product.update({ imageUrl }, { where: { id } });
+
+    res.json({ imageUrl });
+  } catch (error) {
+    console.error('Main image upload error:', error);
+    res.status(500).json({ error: 'Failed to upload main image' });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const OLD_IMGBB_API_KEY = process.env.OLD_IMGBB_API_KEY; // Replace with your old API key
+const NEW_IMGBB_API_KEY = process.env.NEW_IMGBB_API_KEY; // Replace with your new API key
+
+
+
+
+// Helper function to upload an image using the new API key
+const uploadImage = async (base64Image, resizeOptions = null) => {
+  const payload = { image: base64Image };
+  if (resizeOptions) {
+    payload.resize = resizeOptions;
+  }
+
+  const response = await axios.post(
+    `https://api.imgbb.com/1/upload?key=${NEW_IMGBB_API_KEY}`,
+    payload,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+
+
+  return response.data.data;
+};
+
+// Helper function to fetch an image using the new API key, falling back to the old key if needed
+const fetchImage = async (imageId) => {
+  try {
+    // Try fetching with the new API key
+    const response = await axios.get(`https://api.imgbb.com/1/image/${imageId}?key=${NEW_IMGBB_API_KEY}`);
+    return response.data.data.url;
+  } catch (error) {
+    if (error.response?.status === 404 || error.response?.data?.error?.code === 100) {
+      // Fallback to the old API key
+      const response = await axios.get(`https://api.imgbb.com/1/image/${imageId}?key=${OLD_IMGBB_API_KEY}`);
+      return response.data.data.url;
+    }
+    throw error; // Re-throw if it's not a 404 or rate limit error
+  }
+};
+
+exports.uploadThumbnails = async (req, res) => {
+  try {
+    const allowedFormats = ['image/jpeg', 'image/png', 'image/webp'];
+    const invalidFiles = req.files.filter(f => !allowedFormats.includes(f.mimetype));
+
+    if (invalidFiles.length > 0) {
+      return res.status(400).json({
+        error: 'Unsupported file type',
+        details: `We only accept: ${allowedFormats.join(',')}`
+      });
+    }
+
+    console.log('Raw files received:', req.files);
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files received' });
+    }
+
+    const uploadedImages = [];
+    for (const file of req.files) {
+      // Convert buffer to base64
+      const base64Image = file.buffer.toString('base64');
+
+      // Upload thumbnail using the new API key
+      const thumbnailResponse = await uploadImage(base64Image, {
+        width: 50,
+        height: 50,
+        method: 'cover' // Ensures exact dimensions
+      });
+
+      console.log("ImgBB Thumbnail Response:", thumbnailResponse);
+
+      // Upload full-resolution image using the new API key
+      const fullImageResponse = await uploadImage(base64Image, {
+        width: 100,
+        height: 100,
+        method: 'inside' // Maintains aspect ratio
+      });
+
+      console.log("ImgBB fullImage Response:", fullImageResponse);
+
+      // Save to database
+      const image = await Image.create({
+        url: fullImageResponse.url,
+        thumbnail: thumbnailResponse.thumb.url, // Use the correct thumbnail URL
+        productId: req.params.id,
+        order: uploadedImages.length
+      });
+
+      uploadedImages.push(image);
+    }
+
+    // Fetch logic for existing images (if needed)
+    const existingImageIds = req.body.existingImageIds || []; // Pass existing image IDs from the frontend
+    const fetchedImages = [];
+    for (const imageId of existingImageIds) {
+      try {
+        const imageUrl = await fetchImage(imageId);
+        fetchedImages.push({ id: imageId, url: imageUrl });
+      } catch (error) {
+        console.error(`Failed to fetch image ${imageId}:`, error);
+        fetchedImages.push({ id: imageId, error: 'Failed to fetch image' });
+      }
+    }
+
+    // Send response to frontend
+    res.json({
+      success: true,
+      message: 'Images uploaded and fetched successfully',
+      uploadedImages: uploadedImages.map(img => ({
+        id: img.id,
+        url: img.url,
+        thumbnail: img.thumbnail,
+        order: img.order
+      })),
+      fetchedImages: fetchedImages
+    });
+  } catch (error) {
+    console.error('Full upload error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data
+    });
+    res.status(500).json({
+      error: 'Upload failed',
+      details: error.message
+    });
+  }
+};
+exports.deleteImage = async (req, res) => {
+  try {
+    await Image.destroy({
+      where: {
+        id: req.params.imageId,
+        productId: req.params.productId
+      }
+    });
+    res.json({ message: 'Image deleted successfully' });
+  } catch (error) {
+    console.error('Image deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete image' });
+  }
 };
 
 module.exports = exports;

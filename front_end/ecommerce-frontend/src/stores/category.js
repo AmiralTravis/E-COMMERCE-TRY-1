@@ -14,7 +14,17 @@ export const useCategoryStore = defineStore('categories', {
   getters: {
     getMainCategories: (state) => state.mainCategories,
     getSubcategories: (state) => (mainCategoryId) => 
-      state.categories.filter(c => c.parentId === mainCategoryId)
+      state.categories.filter(c => c.parentId === mainCategoryId),
+    flatCategories: (state) => {
+      const flatten = (categories, parent = null) => 
+        categories.reduce((acc, category) => [
+          ...acc,
+          { ...category, parentId: parent?.id || null },
+          ...flatten(category.children || [], category)
+        ], [])
+      
+      return flatten(state.categories)
+    }
   },
 
   actions: {

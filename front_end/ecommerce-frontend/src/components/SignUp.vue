@@ -109,6 +109,15 @@
               Log in
             </router-link>
           </p>
+          <p class="mt-2">
+    Want to sell on our platform? 
+    <router-link 
+      to="/seller/register" 
+      class="text-emerald-900 hover:text-emerald-800 underline font-medium"
+    >
+      Register as a Seller
+    </router-link>
+  </p>
         </div>
       </form>
       </div>

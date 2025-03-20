@@ -79,6 +79,102 @@ const generateTrackingNumber = () => {
 };
 
 
+// exports.createOrder = async (req, res) => {
+//   const t = await sequelize.transaction();
+  
+//   try {
+//     const { items, totalAmount } = req.body;
+//     const trackingNumber = generateTrackingNumber();
+
+//     // Round the totalAmount to two decimal places
+//     const roundedTotalAmount = parseFloat(totalAmount.toFixed(2));  // Ensure it's rounded
+
+//     // Create order within transaction
+//     const order = await Order.create({
+//       userId: req.user.id,
+//       totalAmount: roundedTotalAmount,  // Save the rounded value
+//       status: 'Pending',
+//       paymentVerified: true,
+//       completedAt: null,
+//       trackingNumber: trackingNumber,
+//       estimatedDeliveryDate: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000))
+//     }, { transaction: t });
+
+//     // Create order items
+//     await createOrderItems(order.id, items);
+    
+//     await t.commit();
+//     console.log('Created order with items:', order);
+//     res.status(201).json(order);
+
+//   } catch (err) {
+//     await t.rollback();
+//     console.error('Order creation error:', err);
+//     res.status(500).json({ error: 'Failed to create order' });
+//   }
+// };
+
+
+// Update an order
+// exports.createOrder = async (req, res) => {
+//   const t = await sequelize.transaction();
+  
+//   try {
+//     const { items, totalAmount } = req.body;
+//     const trackingNumber = generateTrackingNumber();
+
+//     // Round the totalAmount to two decimal places
+//     const roundedTotalAmount = parseFloat(totalAmount.toFixed(2));
+
+//     // Get the sellerId from the first product in the order
+//     const firstProduct = await Product.findByPk(items[0].productId);
+//     if (!firstProduct) {
+//       throw new Error('Product not found');
+//     }
+//     const sellerId = firstProduct.sellerId;
+
+//     // Create order within transaction
+//     const order = await Order.create({
+//       userId: req.user.id,
+//       sellerId, // Add sellerId here
+//       totalAmount: roundedTotalAmount,
+//       status: 'Pending',
+//       paymentVerified: true,
+//       completedAt: null,
+//       trackingNumber: trackingNumber,
+//       estimatedDeliveryDate: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000))
+//     }, { transaction: t });
+
+//     // Create order items and update stock
+//     await Promise.all(
+//       items.map(async item => {
+//         // Create order item
+//         await OrderItems.create({
+//           orderId: order.id,
+//           productId: item.productId,
+//           quantity: item.quantity,
+//           subtotal: item.subtotal
+//         }, { transaction: t });
+
+//         // Update product stock
+//         await Product.decrement('stock', {
+//           by: item.quantity,
+//           where: { id: item.productId },
+//           transaction: t
+//         });
+//       })
+//     );
+
+//     await t.commit();
+//     console.log('Created order with items:', order);
+//     res.status(201).json(order);
+
+//   } catch (err) {
+//     await t.rollback();
+//     console.error('Order creation error:', err);
+//     res.status(500).json({ error: 'Failed to create order' });
+//   }
+// };
 exports.createOrder = async (req, res) => {
   const t = await sequelize.transaction();
   
@@ -87,12 +183,20 @@ exports.createOrder = async (req, res) => {
     const trackingNumber = generateTrackingNumber();
 
     // Round the totalAmount to two decimal places
-    const roundedTotalAmount = parseFloat(totalAmount.toFixed(2));  // Ensure it's rounded
+    const roundedTotalAmount = parseFloat(totalAmount.toFixed(2));
+
+    // Get the sellerId from the first product in the order
+    const firstProduct = await Product.findByPk(items[0].productId);
+    if (!firstProduct) {
+      throw new Error('Product not found');
+    }
+    const sellerId = firstProduct.sellerId;
 
     // Create order within transaction
     const order = await Order.create({
       userId: req.user.id,
-      totalAmount: roundedTotalAmount,  // Save the rounded value
+      sellerId, // Add sellerId here
+      totalAmount: roundedTotalAmount,
       status: 'Pending',
       paymentVerified: true,
       completedAt: null,
@@ -100,9 +204,35 @@ exports.createOrder = async (req, res) => {
       estimatedDeliveryDate: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000))
     }, { transaction: t });
 
-    // Create order items
-    await createOrderItems(order.id, items);
-    
+    // Create order items and update stock
+    await Promise.all(
+      items.map(async item => {
+        // Fetch product price
+        const product = await Product.findByPk(item.productId, { transaction: t });
+        if (!product) {
+          throw new Error(`Product with ID ${item.productId} not found`);
+        }
+
+        // Calculate subtotal
+        const subtotal = item.quantity * product.price;
+
+        // Create order item
+        await OrderItems.create({
+          orderId: order.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          subtotal: subtotal // Ensure subtotal is calculated and passed
+        }, { transaction: t });
+
+        // Update product stock
+        await Product.decrement('stock', {
+          by: item.quantity,
+          where: { id: item.productId },
+          transaction: t
+        });
+      })
+    );
+
     await t.commit();
     console.log('Created order with items:', order);
     res.status(201).json(order);
@@ -114,8 +244,6 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-
-// Update an order
 exports.updateOrder = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;

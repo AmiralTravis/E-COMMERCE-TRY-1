@@ -9,6 +9,14 @@ module.exports = (sequelize, DataTypes) => {
     isMainCategory: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
+    },
+    parentId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Categories',
+        key: 'id'
+      }
     }
   }, {
     timestamps: true,

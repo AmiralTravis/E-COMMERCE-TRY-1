@@ -16,6 +16,13 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id',
       }
     },
+    sellerId: { // Add this field
+      type: DataTypes.INTEGER,
+      references: {
+        model: 'Users',
+        key: 'id',
+      }
+    },
     totalAmount: {
       type: DataTypes.DOUBLE,
       allowNull: false
@@ -70,6 +77,7 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'userId',
       sourceKey: 'userId'
     });
+    Order.belongsTo(models.User, { foreignKey: 'sellerId', as: 'seller' }); 
 
     Order.hasMany(models.OrderItems, {
       foreignKey: 'orderId',

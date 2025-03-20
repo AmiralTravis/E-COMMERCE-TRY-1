@@ -20,7 +20,7 @@ exports.getCart = async (req, res) => {
       include: [{
         model: Product,
         as: 'product', // Specify the alias here
-        attributes: ['id', 'name', 'price'],
+        attributes: ['id', 'name', 'price', 'imageUrl'],
       }],
       logging: console.log
     });

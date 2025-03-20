@@ -10,6 +10,9 @@ const { generateAvatar } = require('../utils/avatarGenerator');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../utils/emailService');
 
+const { Image } = require('../models');
+const { processImage } = require('../utils/imageProcessor');
+
 
 // JWT secrets and expiry settings
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -30,15 +33,75 @@ const argon2Options = {
 };
 
 // Get all users (Admin only)
+// exports.getAllUsers = async (req, res) => {
+//   try {
+//     const users = await User.findAll();
+//     res.json(users);
+//   } catch (err) {
+//     console.error('Error fetching users:', err);
+//     res.status(500).json({ error: 'Failed to fetch users' });
+//   }
+// };
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.findAll();
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'email', 'role', 'createdAt']
+    });
     res.json(users);
   } catch (err) {
     console.error('Error fetching users:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 };
+
+// Approve a pending seller
+exports.approveSeller = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findByPk(id);
+    if (!user || user.role !== 'pending_seller') {
+      return res.status(404).json({ error: 'Pending seller not found' });
+    }
+    await user.update({ role: 'seller', sellerApproved: true });
+    res.json({ message: 'Seller approved successfully' });
+  } catch (err) {
+    console.error('Error approving seller:', err);
+    res.status(500).json({ error: 'Failed to approve seller' });
+  }
+};
+
+// Reject a pending seller
+exports.rejectSeller = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findByPk(id);
+    if (!user || user.role !== 'pending_seller') {
+      return res.status(404).json({ error: 'Pending seller not found' });
+    }
+    await user.update({ role: 'user', sellerApproved: false, businessName: null, taxId: null });
+    res.json({ message: 'Seller rejected successfully' });
+  } catch (err) {
+    console.error('Error rejecting seller:', err);
+    res.status(500).json({ error: 'Failed to reject seller' });
+  }
+};
+
+// Delete a user
+exports.deleteUser = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    await user.destroy();
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+};
+
 
 // Get a user by ID
 exports.getUserById = async (req, res) => {
@@ -59,109 +122,193 @@ exports.getUserById = async (req, res) => {
 
 // Register a new user
 
+// exports.registerUser = async (req, res) => {
+//   const { username, email, password } = req.body;
+
+//   try {
+//       // Check if username or email already exists
+//       const existingUser = await User.findOne({
+//           where: {
+//               [Op.or]: [{ username }, { email }]
+//           }
+//       });
+
+//       if (existingUser) {
+//           return res.status(409).json({ error: 'Username or email already exists' });
+//       }
+
+//       // Hash password with Argon2
+//       const hashedPassword = await argon2.hash(password, argon2Options);
+
+//       // Create new user WITHOUT the id:
+//       const newUser = await User.create({ 
+//           username, 
+//           email, 
+//           password: hashedPassword // No id here!
+//       });
+
+//       // Generate avatar URL using the new user's id and username
+//       const profilePicUrl = await generateAvatar(newUser.id, username);
+
+//       // Update the user with the generated profile picture URL
+//       await newUser.update({ profilePicUrl });
+
+//       // Generate tokens (no changes needed here)
+//       const accessToken = jwt.sign(
+//           { id: newUser.id, username: newUser.username },
+//           JWT_SECRET,
+//           { expiresIn: ACCESS_TOKEN_EXPIRY }
+//       );
+//       const refreshToken = jwt.sign(
+//           { id: newUser.id },
+//           JWT_REFRESH_SECRET,
+//           { expiresIn: REFRESH_TOKEN_EXPIRY }
+//       );
+
+//       // Set cookies (no changes needed here)
+//       res.cookie('accessToken', accessToken, { /* ... */ });
+//       res.cookie('refreshToken', refreshToken, { /* ... */ });
+
+//       // Respond with user info and access token (no changes needed here)
+//       res.status(201).json({
+//           message: 'Registration successful',
+//           user: {
+//               id: newUser.id,
+//               username: newUser.username,
+//               email: newUser.email,
+//               profilePicUrl: newUser.profilePicUrl
+//           },
+//           accessToken
+//       });
+
+//   } catch (err) {
+//       console.error('Registration error:', err);
+//       res.status(500).json({ error: 'Failed to register user' });
+//   }
+// };
+// exports.registerUser = async (req, res) => {
+//   const { username, email, password } = req.body;
+
+//   try {
+//     // Check if username or email already exists
+//     const existingUser = await User.findOne({
+//       where: {
+//         [Op.or]: [{ username }, { email }]
+//       }
+//     });
+
+//     if (existingUser) {
+//       return res.status(409).json({ error: 'Username or email already exists' });
+//     }
+
+//     // Hash password with Argon2
+//     const hashedPassword = await argon2.hash(password, argon2Options);
+
+//     // Create new user with the default role of 'user'
+//     const newUser = await User.create({ 
+//       username, 
+//       email, 
+//       password: hashedPassword,
+//       role: 'user' // Explicitly set the role to 'user'
+//     });
+
+//     // Generate avatar URL using the new user's id and username
+//     const profilePicUrl = await generateAvatar(newUser.id, username);
+
+//     // Update the user with the generated profile picture URL
+//     await newUser.update({ profilePicUrl });
+
+//     // Generate tokens
+//     const accessToken = jwt.sign(
+//       { id: newUser.id, username: newUser.username, role: newUser.role },
+//       JWT_SECRET,
+//       { expiresIn: ACCESS_TOKEN_EXPIRY }
+//     );
+//     const refreshToken = jwt.sign(
+//       { id: newUser.id },
+//       JWT_REFRESH_SECRET,
+//       { expiresIn: REFRESH_TOKEN_EXPIRY }
+//     );
+
+//     // Set cookies
+//     res.cookie('accessToken', accessToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 60 * 60 * 1000 // 1 hour
+//     });
+//     res.cookie('refreshToken', refreshToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+//     });
+
+//     // Respond with user info and access token
+//     res.status(201).json({
+//       message: 'Registration successful',
+//       user: {
+//         id: newUser.id,
+//         username: newUser.username,
+//         email: newUser.email,
+//         profilePicUrl: newUser.profilePicUrl,
+//         role: newUser.role // Include role in the response
+//       },
+//       accessToken
+//     });
+
+//   } catch (err) {
+//     console.error('Registration error:', err);
+//     res.status(500).json({ error: 'Failed to register user' });
+//   }
+// };
 exports.registerUser = async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, businessName, taxId } = req.body;
 
   try {
-      // Check if username or email already exists
-      const existingUser = await User.findOne({
-          where: {
-              [Op.or]: [{ username }, { email }]
-          }
-      });
-
-      if (existingUser) {
-          return res.status(409).json({ error: 'Username or email already exists' });
-      }
-
-      // Hash password with Argon2
-      const hashedPassword = await argon2.hash(password, argon2Options);
-
-      // Create new user WITHOUT the id:
-      const newUser = await User.create({ 
-          username, 
-          email, 
-          password: hashedPassword // No id here!
-      });
-
-      // Generate avatar URL using the new user's id and username
-      const profilePicUrl = await generateAvatar(newUser.id, username);
-
-      // Update the user with the generated profile picture URL
-      await newUser.update({ profilePicUrl });
-
-      // Generate tokens (no changes needed here)
-      const accessToken = jwt.sign(
-          { id: newUser.id, username: newUser.username },
-          JWT_SECRET,
-          { expiresIn: ACCESS_TOKEN_EXPIRY }
-      );
-      const refreshToken = jwt.sign(
-          { id: newUser.id },
-          JWT_REFRESH_SECRET,
-          { expiresIn: REFRESH_TOKEN_EXPIRY }
-      );
-
-      // Set cookies (no changes needed here)
-      res.cookie('accessToken', accessToken, { /* ... */ });
-      res.cookie('refreshToken', refreshToken, { /* ... */ });
-
-      // Respond with user info and access token (no changes needed here)
-      res.status(201).json({
-          message: 'Registration successful',
-          user: {
-              id: newUser.id,
-              username: newUser.username,
-              email: newUser.email,
-              profilePicUrl: newUser.profilePicUrl
-          },
-          accessToken
-      });
-
-  } catch (err) {
-      console.error('Registration error:', err);
-      res.status(500).json({ error: 'Failed to register user' });
-  }
-};
-
-// Login user
-
-exports.loginUser = async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    // Input validation
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username/Email and password are required' });
-    }
-
-    // Find the user by username or email, including the role
-    const user = await User.findOne({
+    // Check if username or email already exists
+    const existingUser = await User.findOne({
       where: {
-        [Op.or]: [{ username }, { email: username }]
-      },
-      attributes: ['id', 'username', 'password', 'role'] // Include role here
+        [Op.or]: [{ username }, { email }]
+      }
     });
 
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid username/email or password' });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username or email already exists' });
     }
 
-    // Compare provided password with the stored hashed password using Argon2
-    const validPassword = await argon2.verify(user.password, password);
+    // Hash password with Argon2
+    const hashedPassword = await argon2.hash(password, argon2Options);
 
-    if (!validPassword) {
-      return res.status(401).json({ message: 'Invalid username/email or password' });
-    }
+    // Determine the role based on the endpoint
+    const isSellerRegistration = req.originalUrl.includes('/register-seller');
+    const role = isSellerRegistration ? 'pending_seller' : 'user';
+
+    // Create new user
+    const newUser = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      role,
+      businessName: isSellerRegistration ? businessName : null, // Only set for sellers
+      taxId: isSellerRegistration ? taxId : null, // Only set for sellers
+      sellerApproved: isSellerRegistration ? false : null // Only set for sellers
+    });
+
+    // Generate avatar URL using the new user's id and username
+    const profilePicUrl = await generateAvatar(newUser.id, username);
+
+    // Update the user with the generated profile picture URL
+    await newUser.update({ profilePicUrl });
 
     // Generate tokens
     const accessToken = jwt.sign(
-      { id: user.id, username: user.username, role: user.role }, // Include role in token payload
+      { id: newUser.id, username: newUser.username, role: newUser.role },
       JWT_SECRET,
       { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
     const refreshToken = jwt.sign(
-      { id: user.id },
+      { id: newUser.id },
       JWT_REFRESH_SECRET,
       { expiresIn: REFRESH_TOKEN_EXPIRY }
     );
@@ -181,6 +328,210 @@ exports.loginUser = async (req, res) => {
     });
 
     // Respond with user info and access token
+    res.status(201).json({
+      message: 'Registration successful',
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+        profilePicUrl: newUser.profilePicUrl,
+        businessName: newUser.businessName,
+        taxId: newUser.taxId
+      },
+      accessToken
+    });
+
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Failed to register user' });
+  }
+};
+
+// Login user
+
+// exports.loginUser = async (req, res) => {
+//   const { username, password } = req.body;
+
+//   try {
+//     // Input validation
+//     if (!username || !password) {
+//       return res.status(400).json({ error: 'Username/Email and password are required' });
+//     }
+
+//     // Find the user by username or email, including the role
+//     const user = await User.findOne({
+//       where: {
+//         [Op.or]: [{ username }, { email: username }]
+//       },
+//       attributes: ['id', 'username', 'password', 'role'] // Include role here
+//     });
+
+//     if (!user) {
+//       return res.status(401).json({ message: 'Invalid username/email or password' });
+//     }
+
+//     // Compare provided password with the stored hashed password using Argon2
+//     const validPassword = await argon2.verify(user.password, password);
+
+//     if (!validPassword) {
+//       return res.status(401).json({ message: 'Invalid username/email or password' });
+//     }
+
+//     // Generate tokens
+//     const accessToken = jwt.sign(
+//       { id: user.id, username: user.username, role: user.role }, // Include role in token payload
+//       JWT_SECRET,
+//       { expiresIn: ACCESS_TOKEN_EXPIRY }
+//     );
+//     const refreshToken = jwt.sign(
+//       { id: user.id },
+//       JWT_REFRESH_SECRET,
+//       { expiresIn: REFRESH_TOKEN_EXPIRY }
+//     );
+
+//     // Set cookies
+//     res.cookie('accessToken', accessToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 60 * 60 * 1000 // 1 hour
+//     });
+//     res.cookie('refreshToken', refreshToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+//     });
+
+//     // Respond with user info and access token
+//     res.status(200).json({
+//       message: 'Login successful',
+//       user: {
+//         id: user.id,
+//         username: user.username,
+//         role: user.role,
+//         hasAddresses: user.addresses && user.addresses.length > 0
+//       }
+//     });
+
+//   } catch (err) {
+//     console.error('Login error:', err);
+//     res.status(500).json({ error: 'Failed to login user' });
+//   }
+// };
+// exports.loginUser = async (req, res) => {
+//   const { username, password } = req.body;
+
+//   try {
+//     // Input validation
+//     if (!username || !password) {
+//       return res.status(400).json({ error: 'Username/Email and password are required' });
+//     }
+
+//     // Find the user by username or email, including the role
+//     const user = await User.findOne({
+//       where: {
+//         [Op.or]: [{ username }, { email: username }]
+//       },
+//       attributes: ['id', 'username', 'password', 'role'] // Include role here
+//     });
+
+//     if (!user) {
+//       return res.status(401).json({ message: 'Invalid username/email or password' });
+//     }
+
+//     // Compare provided password with the stored hashed password using Argon2
+//     const validPassword = await argon2.verify(user.password, password);
+
+//     if (!validPassword) {
+//       return res.status(401).json({ message: 'Invalid username/email or password' });
+//     }
+
+//     // Generate tokens
+//     const accessToken = jwt.sign(
+//       { id: user.id, username: user.username, role: user.role }, // Include role in token payload
+//       JWT_SECRET,
+//       { expiresIn: ACCESS_TOKEN_EXPIRY }
+//     );
+//     const refreshToken = jwt.sign(
+//       { id: user.id },
+//       JWT_REFRESH_SECRET,
+//       { expiresIn: REFRESH_TOKEN_EXPIRY }
+//     );
+
+//     // Set cookies
+//     res.cookie('accessToken', accessToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 60 * 60 * 1000 // 1 hour
+//     });
+//     res.cookie('refreshToken', refreshToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+//     });
+
+//     // Respond with user info and access token
+//     res.status(200).json({
+//       message: 'Login successful',
+//       user: {
+//         id: user.id,
+//         username: user.username,
+//         role: user.role, // Include role in the response
+//         hasAddresses: user.addresses && user.addresses.length > 0
+//       }
+//     });
+
+//   } catch (err) {
+//     console.error('Login error:', err);
+//     res.status(500).json({ error: 'Failed to login user' });
+//   }
+// };
+exports.loginUser = async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    // Find the user by username or email
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [{ username }, { email: username }]
+      },
+      attributes: ['id', 'username', 'password', 'role']
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid username/email or password' });
+    }
+
+    // Block pending sellers from logging in
+    if (user.role === 'pending_seller') {
+      return res.status(403).json({ message: 'Your seller account is pending approval' });
+    }
+
+    // Verify password
+    const validPassword = await argon2.verify(user.password, password);
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Invalid username/email or password' });
+    }
+
+    // Generate tokens and respond
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      JWT_REFRESH_SECRET,
+      { expiresIn: REFRESH_TOKEN_EXPIRY }
+    );
+
+    res.cookie('accessToken', accessToken, { /* cookie options */ });
+    res.cookie('refreshToken', refreshToken, { /* cookie options */ });
+
     res.status(200).json({
       message: 'Login successful',
       user: {
@@ -190,13 +541,11 @@ exports.loginUser = async (req, res) => {
         hasAddresses: user.addresses && user.addresses.length > 0
       }
     });
-
-  } catch (err) {
-    console.error('Login error:', err);
+  } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Failed to login user' });
   }
 };
-
 
 // // Update user details
 
@@ -235,23 +584,23 @@ exports.updateUser = async (req, res) => {
 };
 
 // Delete a user
-exports.deleteUser = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const deleted = await User.destroy({
-      where: { id }
-    });
+// exports.deleteUser = async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     const deleted = await User.destroy({
+//       where: { id }
+//     });
 
-    if (deleted) {
-      return res.status(204).send();
-    }
+//     if (deleted) {
+//       return res.status(204).send();
+//     }
 
-    return res.status(404).json({ error: 'User not found' });
-  } catch (err) {
-    console.error('Delete error:', err);
-    res.status(500).json({ error: 'Failed to delete user' });
-  }
-};
+//     return res.status(404).json({ error: 'User not found' });
+//   } catch (err) {
+//     console.error('Delete error:', err);
+//     res.status(500).json({ error: 'Failed to delete user' });
+//   }
+// };
 
 
 
@@ -416,3 +765,175 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({ error: errorMessage });
   }
 };
+
+
+
+// Add to existing exports
+exports.updateAvatar = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image uploaded' });
+    }
+
+    const processed = await processImage(req.file.path, 'avatar');
+    
+    // Update user
+    await User.update(
+      { profilePicUrl: processed.medium },
+      { where: { id: userId } }
+    );
+
+    // Store all sizes in Image table
+    await Image.create({
+      type: 'avatar',
+      original: processed.medium,
+      large: processed.medium,
+      medium: processed.medium,
+      small: processed.small,
+      thumbnail: processed.thumbnail,
+      userId
+    });
+
+    res.json({ 
+      profilePicUrl: `${process.env.BASE_URL}/${processed.medium}`
+    });
+  } catch (error) {
+    console.error('Avatar update error:', error);
+    res.status(500).json({ error: 'Failed to update avatar' });
+  }
+};
+
+
+// exports.registerSeller = async (req, res) => {
+//   console.log('Request Body:', req.body); // Log the request body
+
+//   const { businessName, taxId } = req.body;
+
+//   try {
+//     const user = await User.findByPk(req.user.id);
+
+//     // Validate user can become a seller
+//     if (user.role !== 'user') {
+//       return res.status(400).json({ error: 'Only regular users can become sellers' });
+//     }
+
+//     // Update user to pending seller
+//     await user.update({
+//       role: 'pending_seller',
+//       businessName,
+//       taxId,
+//       sellerApproved: false
+//     });
+
+//     // Notify admin for approval
+//     await sendEmail(
+//       process.env.ADMIN_EMAIL,
+//       'New Seller Registration',
+//       `User ${user.username} (${user.email}) has registered as a seller. Please review their application.`
+//     );
+
+//     res.json({
+//       message: 'Seller registration submitted for approval',
+//       user: {
+//         id: user.id,
+//         username: user.username,
+//         email: user.email,
+//         role: user.role,
+//         businessName: user.businessName,
+//         taxId: user.taxId
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Seller registration error:', error);
+//     res.status(500).json({ error: 'Failed to register as seller' });
+//   }
+// };
+
+
+// exports.registerUser = async (req, res) => {
+//   const { username, email, password, businessName, taxId } = req.body;
+
+//   try {
+//     // Check if username or email already exists
+//     const existingUser = await User.findOne({
+//       where: {
+//         [Op.or]: [{ username }, { email }]
+//       }
+//     });
+
+//     if (existingUser) {
+//       return res.status(409).json({ error: 'Username or email already exists' });
+//     }
+
+//     // Hash password with Argon2
+//     const hashedPassword = await argon2.hash(password, argon2Options);
+
+//     // Determine the role based on the endpoint
+//     const isSellerRegistration = req.originalUrl.includes('/register-seller');
+//     const role = isSellerRegistration ? 'pending_seller' : 'user';
+
+//     // Create new user
+//     const newUser = await User.create({
+//       username,
+//       email,
+//       password: hashedPassword,
+//       role,
+//       businessName: isSellerRegistration ? businessName : null, // Only set for sellers
+//       taxId: isSellerRegistration ? taxId : null, // Only set for sellers
+//       sellerApproved: isSellerRegistration ? false : null // Only set for sellers
+//     });
+
+//     // Generate avatar URL using the new user's id and username
+//     const profilePicUrl = await generateAvatar(newUser.id, username);
+
+//     // Update the user with the generated profile picture URL
+//     await newUser.update({ profilePicUrl });
+
+//     // Generate tokens
+//     const accessToken = jwt.sign(
+//       { id: newUser.id, username: newUser.username, role: newUser.role },
+//       JWT_SECRET,
+//       { expiresIn: ACCESS_TOKEN_EXPIRY }
+//     );
+//     const refreshToken = jwt.sign(
+//       { id: newUser.id },
+//       JWT_REFRESH_SECRET,
+//       { expiresIn: REFRESH_TOKEN_EXPIRY }
+//     );
+
+//     // Set cookies
+//     res.cookie('accessToken', accessToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 60 * 60 * 1000 // 1 hour
+//     });
+//     res.cookie('refreshToken', refreshToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'lax',
+//       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+//     });
+
+//     // Respond with user info and access token
+//     res.status(201).json({
+//       message: 'Registration successful',
+//       user: {
+//         id: newUser.id,
+//         username: newUser.username,
+//         email: newUser.email,
+//         role: newUser.role,
+//         profilePicUrl: newUser.profilePicUrl,
+//         businessName: newUser.businessName,
+//         taxId: newUser.taxId
+//       },
+//       accessToken
+//     });
+
+//   } catch (err) {
+//     console.error('Registration error:', err);
+//     res.status(500).json({ error: 'Failed to register user' });
+//   }
+// };
