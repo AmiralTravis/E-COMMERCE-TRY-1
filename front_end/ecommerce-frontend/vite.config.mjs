@@ -32,6 +32,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['e-commerce-1-12dd.onrender.com'],
     port: 5173,
     proxy: {
       '/api': 'http://localhost:5000',
