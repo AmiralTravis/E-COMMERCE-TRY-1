@@ -1,0 +1,1 @@
+.animate-pulse[data-v-ccd13040]{animation:pulse-ccd13040 2s cubic-bezier(.4,0,.6,1) infinite}@keyframes pulse-ccd13040{0%,to{opacity:1}50%{opacity:.5}}

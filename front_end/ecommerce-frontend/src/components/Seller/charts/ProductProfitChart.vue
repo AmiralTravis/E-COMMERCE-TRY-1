@@ -18,10 +18,6 @@
         <span>Profit</span>
       </div>
       <div class="legend-item">
-        <div class="legend-color" style="background-color: rgba(239, 68, 68, 0.8);"></div>
-        <span>Loss</span>
-      </div>
-      <div class="legend-item">
         <div class="legend-color legend-dashed" style="background-color: rgba(16, 185, 129, 0.2);"></div>
         <span>Profit Trend</span>
       </div>
@@ -105,20 +101,13 @@ const prepareDataWithDateRange = (aggregatedData) => {
 
 const drawChart = () => {
   if (!chartContainer.value || !props.chartData || props.chartData.length === 0) return;
-  console.log("Raw Chart Data:", props.chartData); // Log raw data
-  console.log("Start Date:", props.startDate); // Log start date
-  console.log("End Date:", props.endDate); // Log end date
   
   // Clear previous chart
   d3.select(chartContainer.value).selectAll('*').remove();
   
   // Process data
   const aggregatedData = aggregateDataByDay(props.chartData);
-  console.log("Aggregated Data:", aggregatedData); // Log aggregated data
-
   const processedData = prepareDataWithDateRange(aggregatedData);
-  console.log("Processed Data:", processedData); // Log processed data
-
   
   // Set dimensions
   const margin = { top: 20, right: 20, bottom: 30, left: 60 };
@@ -133,27 +122,18 @@ const drawChart = () => {
     .append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`);
   
-  // Create tooltip
-  tooltip = d3.select(chartContainer.value)
-    .append('div')
-    .attr('class', 'chart-tooltip')
-    .style('opacity', 0);
-  
   // Set scales
   const x = d3.scaleTime()
     .domain(d3.extent(processedData, d => d.date))
     .range([0, width]);
   
-  // Calculate max absolute value for symmetrical y-axis
-  const maxAbsValue = d3.max(processedData, d => Math.abs(d.amount));
-  
   const y = d3.scaleLinear()
-    .domain([-maxAbsValue * 0.2, maxAbsValue * 1.2])
+    .domain([0, d3.max(processedData, d => d.amount) * 1.1]) // Start from 0 since profits are non-negative
     .range([height, 0]);
   
   // Add X axis
   svg.append('g')
-    .attr('transform', `translate(0,${y(0)})`)
+    .attr('transform', `translate(0,${height})`)
     .attr('class', 'axis x-axis')
     .call(d3.axisBottom(x)
       .ticks(Math.min(processedData.length, width > 500 ? 7 : 5))
@@ -165,16 +145,6 @@ const drawChart = () => {
     .call(d3.axisLeft(y)
       .ticks(5)
       .tickFormat(d => `$${d3.format(',')(d)}`));
-  
-  // Add zero line
-  svg.append('line')
-    .attr('x1', 0)
-    .attr('x2', width)
-    .attr('y1', y(0))
-    .attr('y2', y(0))
-    .attr('stroke', '#9CA3AF')
-    .attr('stroke-width', 1)
-    .attr('stroke-dasharray', '2,2');
   
   // Add grid lines
   svg.append('g')
@@ -188,30 +158,17 @@ const drawChart = () => {
     .select('path')
     .attr('stroke-width', 0);
   
-  // Define profit/loss areas
-  const areaAbove = d3.area()
+  // Add profit area
+  const area = d3.area()
     .x(d => x(d.date))
     .y0(y(0))
-    .y1(d => y(Math.max(0, d.amount)))
+    .y1(d => y(d.amount))
     .curve(d3.curveMonotoneX);
   
-  const areaBelow = d3.area()
-    .x(d => x(d.date))
-    .y0(y(0))
-    .y1(d => y(Math.min(0, d.amount)))
-    .curve(d3.curveMonotoneX);
-  
-  // Add profit area (above zero)
   svg.append('path')
     .datum(processedData)
     .attr('fill', 'rgba(16, 185, 129, 0.2)')
-    .attr('d', areaAbove);
-  
-  // Add loss area (below zero)
-  svg.append('path')
-    .datum(processedData)
-    .attr('fill', 'rgba(239, 68, 68, 0.2)')
-    .attr('d', areaBelow);
+    .attr('d', area);
   
   // Add profit line
   const profitLine = d3.line()
@@ -222,7 +179,7 @@ const drawChart = () => {
   const line = svg.append('path')
     .datum(processedData)
     .attr('fill', 'none')
-    .attr('stroke', d => d.amount >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)')
+    .attr('stroke', 'rgba(16, 185, 129, 0.8)') // Green line for profit
     .attr('stroke-width', 2)
     .attr('d', profitLine);
   
@@ -254,8 +211,7 @@ const drawChart = () => {
     svg.append('path')
       .datum(trendData)
       .attr('fill', 'none')
-      .attr('stroke', trendData[0].amount < trendData[trendData.length - 1].amount ? 
-        'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)')
+      .attr('stroke', 'rgba(16, 185, 129, 0.8)') // Green dashed line for trend
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '5,5')
       .attr('d', profitLine);
@@ -270,7 +226,7 @@ const drawChart = () => {
     .attr('cx', d => x(d.date))
     .attr('cy', d => y(d.amount))
     .attr('r', 4)
-    .attr('fill', d => d.amount >= 0 ? '#10B981' : '#EF4444')
+    .attr('fill', '#10B981') // Green dots for profit
     .attr('stroke', 'white')
     .attr('stroke-width', 2)
     .on('mouseover', function(event, d) {
@@ -285,7 +241,7 @@ const drawChart = () => {
       
       tooltip.html(`
         <div class="tooltip-date">${d3.timeFormat('%B %d, %Y')(d.date)}</div>
-        <div class="tooltip-value">${d.amount >= 0 ? 'Profit' : 'Loss'}: $${d3.format(',')(Math.abs(d.amount).toFixed(2))}</div>
+        <div class="tooltip-value">Profit: $${d3.format(',')(d.amount.toFixed(2))}</div>
       `)
         .style('left', `${event.offsetX + 10}px`)
         .style('top', `${event.offsetY - 28}px`);

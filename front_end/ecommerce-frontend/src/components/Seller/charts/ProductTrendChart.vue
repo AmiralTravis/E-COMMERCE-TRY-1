@@ -1,6 +1,17 @@
+
+
+
 <template>
-    <div class="trend-chart-container" ref="chartContainer">
-      <svg v-if="!loading" class="trend-chart" :width="width" :height="height" viewBox="0 0 100 40">
+  <div class="trend-chart-container" ref="chartContainer">
+    <div v-if="loading" class="loading-indicator">
+      <div class="loading-spinner"></div>
+    </div>
+    <div v-else-if="!chartData || chartData.length === 0" class="empty-state">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg> No data for selected period
+    </div>
+    <svg v-if="!loading" class="trend-chart" :width="width" :height="height" viewBox="0 0 100 40">
         <!-- Area fill -->
         <path
           :d="areaPath"
@@ -26,11 +37,8 @@
           :fill="color"
         />
       </svg>
-      <div v-if="loading" class="loading-indicator">
-        <div class="loading-spinner"></div>
-      </div>
-    </div>
-  </template>
+  </div>
+</template>
   
   <script setup>
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
@@ -137,19 +145,32 @@ const normalizedData = computed(() => {
   </script>
   
   <style scoped>
-  .trend-chart-container {
+
+.empty-state {
+  @apply absolute inset-0 flex items-center justify-center text-gray-400;
+}
+
+.trend-chart-container {
+  @apply relative h-full w-full min-h-[40px];
+}
+
+.loading-indicator {
+  @apply absolute inset-0 flex items-center justify-center bg-white bg-opacity-50;
+}
+
+  /* .trend-chart-container {
     position: relative;
     width: 100%;
     height: 100%;
     min-height: 40px;
   }
-  
+   */
   .trend-chart {
     width: 100%;
     height: 100%;
   }
   
-  .loading-indicator {
+  /* .loading-indicator {
     position: absolute;
     top: 0;
     left: 0;
@@ -159,7 +180,7 @@ const normalizedData = computed(() => {
     justify-content: center;
     align-items: center;
     background-color: rgba(255, 255, 255, 0.5);
-  }
+  } */
   
   .loading-spinner {
     width: 20px;

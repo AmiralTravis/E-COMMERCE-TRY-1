@@ -889,16 +889,63 @@ const chartData = computed(() => {
   };
 });
 
+// const productChartData = computed(() => {
+//   if (!selectedProductId.value) return { sales: [], profit: [] };
+  
+//   const productData = productSalesData.value[selectedProductId.value] || { sales: [], profit: [] };
+//   return {
+//     sales: processChartData(productData.sales, currentChartView.value),
+//     profit: processChartData(productData.profit, currentChartView.value)
+//   };
+// });
+// const productChartData = computed(() => {
+//   if (!selectedProductId.value) return { sales: [], profit: [] };
+  
+//   const productData = productSalesData.value[selectedProductId.value] || { sales: [], profit: [] };
+  
+//   // Filter data based on the selected date range
+//   const filteredSales = productData.sales.filter(item => {
+//     const itemDate = new Date(item.date);
+//     const startDate = new Date(customStartDate.value);
+//     const endDate = new Date(customEndDate.value);
+//     return itemDate >= startDate && itemDate <= endDate;
+//   });
+
+//   const filteredProfit = productData.profit.filter(item => {
+//     const itemDate = new Date(item.date);
+//     const startDate = new Date(customStartDate.value);
+//     const endDate = new Date(customEndDate.value);
+//     return itemDate >= startDate && itemDate <= endDate;
+//   });
+
+//   return {
+//     sales: processChartData(filteredSales, currentChartView.value),
+//     profit: processChartData(filteredProfit, currentChartView.value)
+//   };
+// });
 const productChartData = computed(() => {
   if (!selectedProductId.value) return { sales: [], profit: [] };
   
   const productData = productSalesData.value[selectedProductId.value] || { sales: [], profit: [] };
+  
+  // Additional date filtering as safety net
+  const filterByDate = (data) => {
+    if (!customStartDate.value || !customEndDate.value) return data;
+    const start = new Date(customStartDate.value);
+    const end = new Date(customEndDate.value);
+    end.setHours(23, 59, 59, 999); // Include entire end day
+
+    return data.filter(item => {
+      const itemDate = new Date(item.date);
+      return itemDate >= start && itemDate <= end;
+    });
+  };
+
   return {
-    sales: processChartData(productData.sales, currentChartView.value),
-    profit: processChartData(productData.profit, currentChartView.value)
+    sales: processChartData(filterByDate(productData.sales)), 
+    profit: processChartData(filterByDate(productData.profit))
   };
 });
-
 const topProducts = computed(() => {
   // Get top 6 products by sales
   const sortedProducts = [...products.value]
@@ -1091,6 +1138,84 @@ const fetchProducts = async () => {
   }
 };
 
+// const fetchProductData = async (productId) => {
+//   if (!productId) return;
+
+//   isProductLoading.value = true;
+
+//   try {
+//     const response = await api.get(`/seller/sales`, {
+//       params: {
+//         productId: productId,
+//         startDate: customStartDate.value,
+//         endDate: customEndDate.value,
+//       },
+//       headers: {
+//         Authorization: `Bearer ${localStorage.getItem('token')}`, // Include the token
+//       },
+//     });
+
+//     // Transform data for charts
+//     const transformedData = response.data.map((item) => ({
+//       date: new Date(item.date),
+//       amount: parseFloat(item.amount),
+//       quantity: item.quantity,
+//       profit: item.profit,
+//     }));
+
+//     // Store transformed data
+//     productSalesData.value[productId] = {
+//       sales: transformedData,
+//       profit: transformedData,
+//       trend: transformedData.map((item) => item.amount),
+//     };
+
+//     console.log('End Date:', customEndDate.value);
+//     console.log('Product ID:', productId);
+//   } catch (error) {
+//     console.error('Error fetching product data:', error);
+//   } finally {
+//     isProductLoading.value = false;
+//   }
+// };
+// const fetchProductData = async (productId) => {
+//   if (!productId) return;
+
+//   isProductLoading.value = true;
+
+//   try {
+//     const response = await api.get(`/seller/sales`, {
+//       params: {
+//         productId: productId,
+//         startDate: customStartDate.value,
+//         endDate: customEndDate.value,
+//       },
+//       headers: {
+//         Authorization: `Bearer ${localStorage.getItem('token')}`,
+//       },
+//     });
+
+//     // Transform data for charts
+//     const transformedData = response.data.map((item) => ({
+//       date: new Date(item.date),
+//       amount: parseFloat(item.amount),
+//       quantity: item.quantity,
+//       profit: item.profit,
+//     }));
+
+//     // Store transformed data
+//     productSalesData.value[productId] = {
+//       sales: transformedData,
+//       profit: transformedData,
+//       trend: transformedData.map((item) => item.amount),
+//     };
+
+//   } catch (error) {
+//     console.error('Error fetching product data:', error);
+//   } finally {
+//     isProductLoading.value = false;
+//   }
+// };
 const fetchProductData = async (productId) => {
   if (!productId) return;
 
@@ -1103,28 +1228,27 @@ const fetchProductData = async (productId) => {
         startDate: customStartDate.value,
         endDate: customEndDate.value,
       },
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`, // Include the token
-      },
     });
 
+    // Filter the response data by productId (frontend safety check)
+    const filteredData = response.data.filter(item => 
+      item.productId.toString() === productId.toString()
+    );
+
     // Transform data for charts
-    const transformedData = response.data.map((item) => ({
+    const transformedData = filteredData.map((item) => ({
       date: new Date(item.date),
       amount: parseFloat(item.amount),
       quantity: item.quantity,
-      profit: item.profit,
+      profit: parseFloat(item.profit),
     }));
 
     // Store transformed data
     productSalesData.value[productId] = {
       sales: transformedData,
       profit: transformedData,
-      trend: transformedData.map((item) => item.amount),
     };
 
-    console.log('End Date:', customEndDate.value);
-    console.log('Product ID:', productId);
   } catch (error) {
     console.error('Error fetching product data:', error);
   } finally {
@@ -1156,17 +1280,21 @@ const selectedProduct = computed(() => {
 });
 
 // Watchers
-watch([customStartDate, customEndDate], () => {
-  if (selectedProductId.value) {
-    fetchProductData(selectedProductId.value);
-  }
-});
+
 
 watch(selectedProductId, (newValue) => {
   if (newValue) {
     fetchProductData(newValue);
   }
 });
+
+watch([customStartDate, customEndDate], () => {
+  if (selectedProductId.value) {
+    fetchProductData(selectedProductId.value);
+  }
+});
+
+
 
 onMounted(() => {
   // Set default time frame to "Today"
@@ -1175,6 +1303,53 @@ onMounted(() => {
   fetchProducts();
 });
 
+// const setDateFilter = (filter) => {
+//   currentDateFilter.value = filter;
+
+//   const today = new Date();
+//   let startDate, endDate;
+
+//   switch (filter) {
+//     case 'today':
+//       startDate = new Date(today);
+//       endDate = new Date(today);
+//       break;
+//     case 'week':
+//       startDate = new Date(today);
+//       startDate.setDate(today.getDate() - today.getDay()); // Start of the week (Sunday)
+//       endDate = new Date(today);
+//       endDate.setDate(today.getDate() + (6 - today.getDay())); // End of the week (Saturday)
+//       break;
+//     case 'month':
+//       startDate = new Date(today.getFullYear(), today.getMonth(), 1); // Start of the month
+//       endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of the month
+//       break;
+//     case 'quarter':
+//       const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+//       startDate = new Date(today.getFullYear(), quarterStartMonth, 1); // Start of the quarter
+//       endDate = new Date(today.getFullYear(), quarterStartMonth + 3, 0); // End of the quarter
+//       break;
+//     case 'year':
+//       startDate = new Date(today.getFullYear(), 0, 1); // Start of the year
+//       endDate = new Date(today.getFullYear(), 11, 31); // End of the year
+//       break;
+//     default:
+//       // For custom dates, do nothing (user will click "Apply")
+//       return;
+//   }
+
+//   // Update the custom date inputs
+//   customStartDate.value = startDate.toISOString().split('T')[0];
+//   customEndDate.value = endDate.toISOString().split('T')[0];
+
+//   // Fetch data for the new date range
+//   fetchData();
+
+//   // Fetch product data if a product is selected
+//   if (selectedProductId.value) {
+//     fetchProductData(selectedProductId.value);
+//   }
+// };
 const setDateFilter = (filter) => {
   currentDateFilter.value = filter;
 
@@ -1210,10 +1385,24 @@ const setDateFilter = (filter) => {
       return;
   }
 
-  // Update the custom date inputs
-  customStartDate.value = startDate.toISOString().split('T')[0];
-  customEndDate.value = endDate.toISOString().split('T')[0];
 
+    // Normalize dates to start/end of day
+    const normalizeDate = (date, isEnd = false) => {
+    const d = new Date(date);
+    if (isEnd) {
+      d.setHours(23, 59, 59, 999);
+    } else {
+      d.setHours(0, 0, 0, 0);
+    }
+    return d.toISOString().split('T')[0];
+  };
+
+  // Update the custom date inputs
+  // customStartDate.value = startDate.toISOString().split('T')[0];
+  // customEndDate.value = endDate.toISOString().split('T')[0];
+  customStartDate.value = normalizeDate(startDate);
+  customEndDate.value = normalizeDate(endDate, true);
+  
   // Fetch data for the new date range
   fetchData();
 
@@ -1222,6 +1411,7 @@ const setDateFilter = (filter) => {
     fetchProductData(selectedProductId.value);
   }
 };
+
 </script>
 
 <style scoped>

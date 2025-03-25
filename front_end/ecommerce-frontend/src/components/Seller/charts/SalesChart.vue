@@ -1,14 +1,28 @@
 <!-- /components/Seller/charts/SalesChart.vue -->
 
-<template>
+<!-- <template>
     <div class="chart-wrapper">
       <div v-if="loading" class="loading-overlay">
         <div class="loading-spinner"></div>
       </div>
       <div class="chart-container" ref="chartContainer"></div>
     </div>
+  </template> -->
+  <template>
+    <div class="chart-wrapper">
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+      </div>
+      <div v-else-if="!chartData || chartData.length === 0" class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <p class="text-gray-500 mt-2">No data available for selected period</p>
+      </div>
+      <div v-else class="chart-container" ref="chartContainer"></div>
+    </div>
   </template>
-  
+
   <script setup>
   import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
   import * as d3 from 'd3';
@@ -60,7 +74,11 @@
   
   
   const drawChart = () => {
-    if (!chartContainer.value || props.chartData.length === 0) return;
+    if (!chartContainer.value) return;
+    d3.select(chartContainer.value).selectAll('*').remove();
+
+    // if (!chartContainer.value || props.chartData.length === 0) return;
+    if (!props.chartData?.length) return;
     
     // Clear previous chart
     d3.select(chartContainer.value).selectAll('*').remove();
@@ -90,11 +108,17 @@
     // Format the data and make sure dates are actual Date objects
     const formattedData = fullDateRange.map(date => {
       // Filter all sales entries for the current date
-      const salesOnDate = props.chartData.filter(d => {
-        const saleDate = new Date(d.date);
-        return saleDate.toDateString() === date.toDateString();
-      });
-      
+      // const salesOnDate = props.chartData.filter(d => {
+      //   const saleDate = new Date(d.date);
+      //   return saleDate.toDateString() === date.toDateString();
+      // });
+      // Use ISO date comparison to avoid timezone issues
+  const targetDate = date.toISOString().split('T')[0];
+  const salesOnDate = props.chartData.filter(d => {
+    const saleDate = new Date(d.date);
+    return saleDate.toISOString().split('T')[0] === targetDate;
+  });
+
       // Sum the amounts for this date
       const totalAmount = salesOnDate.reduce((sum, sale) => sum + parseFloat(sale.amount), 0);
       
@@ -382,10 +406,10 @@ setTimeout(() => {
   
   // Improved resize handler with debounce
   const handleResize = () => {
-    if (chartContainer.value) {
-      drawChart();
-    }
-  };
+  if (props.chartData?.length) {
+    drawChart();
+  }
+};
   
   // Set up efficient resize observer
   const setupResizeObserver = () => {
@@ -416,9 +440,13 @@ setTimeout(() => {
   }
   
   // Watch for changes in data and redraw chart
-  watch(() => props.chartData, () => {
+  watch(() => props.chartData, (newData) => {
+  if (!newData?.length) {
+    d3.select(chartContainer.value)?.selectAll('*').remove();
+  } else {
     drawChart();
-  }, { deep: true });
+  }
+}, { deep: true });
   
   watch(() => props.view, () => {
     drawChart();
@@ -446,11 +474,17 @@ setTimeout(() => {
   });
   </script>
   
-  <style scoped>
+  <!-- <style scoped>
+.empty-state {
+  @apply absolute inset-0 flex flex-col items-center justify-center text-center p-4;
+}
+
   .chart-wrapper {
-    position: relative;
+    /* position: relative;
     height: 300px;
-    width: 100%;
+    width: 100%; */
+    @apply relative h-[300px] w-full;
+
   }
   
   .chart-container {
@@ -468,7 +502,7 @@ setTimeout(() => {
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 5;
+    z-index: 10;
   }
   
   .loading-spinner {
@@ -504,4 +538,58 @@ setTimeout(() => {
     font-size: 12px;
     line-height: 1.4;
   }
-  </style>
+  </style> -->
+  <style scoped>
+.empty-state {
+  @apply absolute inset-0 flex flex-col items-center justify-center p-4 text-center;
+}
+
+.empty-state svg {
+  @apply h-12 w-12 text-gray-400;
+}
+
+.empty-state p {
+  @apply text-gray-500 mt-2;
+}
+
+.chart-wrapper {
+  @apply relative h-[300px] w-full;
+}
+
+.chart-container {
+  @apply h-full w-full;
+}
+
+.loading-overlay {
+  @apply absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10;
+}
+
+.loading-spinner {
+  @apply w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin;
+}
+
+/* Enhanced styling for axes and tooltip */
+:deep(.x-axis path),
+:deep(.y-axis path),
+:deep(.x-axis line),
+:deep(.y-axis line) {
+  stroke: #e5e7eb;
+}
+
+:deep(.x-axis text),
+:deep(.y-axis text) {
+  fill: #6b7280;
+  font-size: 12px;
+}
+
+.chart-tooltip {
+  @apply absolute px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-lg text-sm;
+  z-index: 20;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>
